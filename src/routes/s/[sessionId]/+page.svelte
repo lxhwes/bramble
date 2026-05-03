@@ -266,6 +266,25 @@
 
 	const currentCard = $derived(names[deckIndex] ?? null);
 	const remaining = $derived(names.length - deckIndex);
+
+	// ---------------------------------------------------------------------------
+	// Share + switch partner
+	// ---------------------------------------------------------------------------
+	let toastVisible = $state(false);
+
+	async function share() {
+		if (typeof navigator === 'undefined' || !navigator.clipboard) return;
+		const url = `${window.location.origin}/s/${data.sessionId}`;
+		try {
+			await navigator.clipboard.writeText(url);
+			toastVisible = true;
+			setTimeout(() => {
+				toastVisible = false;
+			}, 2000);
+		} catch {
+			// Permission denied or unsupported — silent failure is acceptable.
+		}
+	}
 </script>
 
 {#if data.slug === null}
@@ -293,6 +312,23 @@
 	<!-- Swipe deck -->
 	<main class="flex min-h-screen flex-col items-center justify-between p-4">
 		<div class="flex w-full max-w-sm flex-col items-center gap-6 pt-8">
+			<!-- Toolbar: switch partner (left) + share (right) -->
+			<div class="flex w-full items-center justify-between gap-3">
+				<a
+					href="/s/{data.sessionId}"
+					class="text-sm text-gray-500 underline hover:text-gray-700"
+				>
+					Switch partner
+				</a>
+				<button
+					type="button"
+					onclick={share}
+					class="rounded-full border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-50"
+				>
+					Share
+				</button>
+			</div>
+
 			<FilterBar state={filterState} onchange={updateFilters} />
 
 			{#if currentCard !== null}
@@ -341,4 +377,15 @@
 			<a href="/s/{data.sessionId}/matches" class="underline hover:text-gray-600">Matches</a>
 		</footer>
 	</main>
+
+	<!-- Share toast -->
+	{#if toastVisible}
+		<div
+			class="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-full bg-gray-800 px-4 py-2 text-sm text-white shadow-lg"
+			role="status"
+			aria-live="polite"
+		>
+			Link copied
+		</div>
+	{/if}
 {/if}
