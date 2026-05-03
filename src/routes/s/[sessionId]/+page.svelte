@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import type { PageData } from './$types';
@@ -273,10 +274,16 @@
 	$effect(() => {
 		// Reset deck index whenever filters change so the user sees results from position 0.
 		// Graduate any pending-undo votes first — they're real swipes against the old filter set.
+		// Wrap the writes in untrack so the effect's dependency set stays scoped to filterState;
+		// otherwise reading pending/undoStack would loop the effect against its own writes.
 		JSON.stringify(filterState);
-		pending = [...pending, ...undoStack];
-		undoStack = [];
-		deckIndex = 0;
+		untrack(() => {
+			if (undoStack.length > 0) {
+				pending = [...pending, ...undoStack];
+				undoStack = [];
+			}
+			deckIndex = 0;
+		});
 	});
 
 	function updateFilters(next: FilterState) {
