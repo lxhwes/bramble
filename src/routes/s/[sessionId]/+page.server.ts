@@ -4,7 +4,12 @@ import type { PageServerLoad } from './$types';
 
 const SLUG_RE = /^[a-z0-9-]{1,32}$/;
 
-export const load: PageServerLoad = async ({ params, url, platform }) => {
+export const load: PageServerLoad = async ({
+	params,
+	url,
+	platform,
+	cookies,
+}) => {
 	const raw = url.searchParams.get('p');
 	const slug = raw !== null ? raw.toLowerCase() : null;
 	const slugValid = slug !== null && SLUG_RE.test(slug);
@@ -28,6 +33,12 @@ export const load: PageServerLoad = async ({ params, url, platform }) => {
 	}
 
 	await addPartner(platform.env.VOTES, params.sessionId, slug);
+
+	cookies.set('bramble_last_session', params.sessionId, {
+		path: '/',
+		maxAge: 2592000,
+		sameSite: 'lax',
+	});
 
 	const [votes, postJoinMeta] = await Promise.all([
 		getVotes(platform.env.VOTES, params.sessionId, slug),
