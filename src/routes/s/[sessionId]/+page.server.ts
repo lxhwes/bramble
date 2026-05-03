@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { addPartner, getSessionMeta } from '$lib/server/sessions';
+import { addPartner, getSessionMeta, getVotes } from '$lib/server/sessions';
 import type { PageServerLoad } from './$types';
 
 const SLUG_RE = /^[a-z0-9-]{1,32}$/;
@@ -25,5 +25,7 @@ export const load: PageServerLoad = async ({ params, url, platform }) => {
 
 	await addPartner(platform.env.VOTES, params.sessionId, slug);
 
-	return { slug, sessionId: params.sessionId };
+	const votes = await getVotes(platform.env.VOTES, params.sessionId, slug);
+
+	return { slug, sessionId: params.sessionId, votes: votes?.votes ?? [] };
 };

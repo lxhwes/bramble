@@ -43,10 +43,18 @@
 
 	const filterState = $derived<FilterState>(parseFilters(page.url.searchParams));
 
+	// Build the set of name|sex keys already voted on at page-load time so we
+	// can skip those positions in the deck without disturbing the shuffle order.
+	const skipSet = $derived(
+		new Set((data.slug ? data.votes : []).map((v) => `${v.name}|${v.sex}`)),
+	);
+
 	const names = $derived(
 		rawNames.length === 0
 			? []
-			: applyFilters(shuffle(rawNames, hashString(data.sessionId)), filterState),
+			: applyFilters(shuffle(rawNames, hashString(data.sessionId)), filterState).filter(
+					(n) => !skipSet.has(`${n.name}|${n.sex}`),
+				),
 	);
 
 	// ---------------------------------------------------------------------------
