@@ -19,7 +19,7 @@ pnpm install
 pnpm dev
 ```
 
-See `docs/` for the project plan and architecture notes.
+See [ROADMAP.md](ROADMAP.md), [ARCHITECTURE.md](ARCHITECTURE.md), and [PHASE-1.md](PHASE-1.md) for the project plan and architecture notes.
 
 ## License
 
