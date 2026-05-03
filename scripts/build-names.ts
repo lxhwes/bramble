@@ -196,26 +196,78 @@ function buildNameEntries(
 }
 
 // ---------------------------------------------------------------------------
-// Behind the Name enrichment (optional)
+// BTN enrichment
 //
-// BTN provides a downloadable file with name + gender + origin + meaning.
-// License: CC BY-SA 4.0 (attribution required; redistribution is permitted).
+// Manual fetch: https://www.behindthename.com/ (exact download path depends on
+// your account — the maintainer must retrieve it manually).
+// Place the downloaded file(s) in data/btn/ (gitignored; never committed).
+// Only the processed static/names.json ships.
 //
-// To activate enrichment:
-//   1. Download the BTN name data from https://www.behindthename.com/
-//   2. Place usable files in data/btn/
+// Expected JSON shape: [{ "name": "Olivia", "origin": "Latin", "meaning": "olive tree" }, ...]
+// Expected CSV shape:  header row `name,origin,meaning` then one entry per line.
 //
-// The maintainer hasn't yet decided whether to vendor the BTN file in the repo
-// or fetch it on demand in this script. This code path is a no-op stub for
-// Phase 0 but activates automatically if data/btn/ contains usable files.
-//
-// Expected format (adjust parsing below if BTN's actual format differs):
-//   name,gender,origin,meaning  (one entry per line, CSV or tab-delimited)
+// License: CC BY-SA 4.0 — attribution required; redistribution permitted.
 // ---------------------------------------------------------------------------
 
 interface BtnRecord {
 	origin: string;
 	meaning: string;
+}
+
+// Minimal JSON BTN record — only fields we consume are required.
+interface BtnJsonRow {
+	name: string;
+	origin: string;
+	meaning: string;
+	// BTN exports may include `gender` or `sex`; we don't need either for enrichment.
+	[key: string]: string;
+}
+
+function parseBtnJson(raw: string, file: string): Map<string, BtnRecord> {
+	const rows = JSON.parse(raw) as BtnJsonRow[];
+	const out = new Map<string, BtnRecord>();
+	for (const row of rows) {
+		if (typeof row.name !== 'string' || !row.name) continue;
+		const origin = typeof row.origin === 'string' ? row.origin : '';
+		const meaning = typeof row.meaning === 'string' ? row.meaning : '';
+		out.set(row.name.toLowerCase(), { origin, meaning });
+	}
+	process.stderr.write(
+		`[build-names] BTN JSON ${file}: loaded ${out.size} records.\n`,
+	);
+	return out;
+}
+
+function parseBtnCsv(raw: string, file: string): Map<string, BtnRecord> {
+	// Simple split-on-comma parser. Does not handle quoted fields containing commas —
+	// if a future BTN export uses quoted CSV, replace this with a quoted-field-aware splitter.
+	const lines = raw.split('\n').filter((l) => l.trim() !== '');
+	if (lines.length === 0) return new Map();
+
+	const header = lines[0].split(',').map((h) => h.trim().toLowerCase());
+	const nameIdx = header.indexOf('name');
+	const originIdx = header.indexOf('origin');
+	const meaningIdx = header.indexOf('meaning');
+
+	if (nameIdx === -1 || originIdx === -1 || meaningIdx === -1) {
+		throw new Error(
+			`Missing required columns (name, origin, meaning) in ${file}; found: ${header.join(', ')}`,
+		);
+	}
+
+	const out = new Map<string, BtnRecord>();
+	for (const line of lines.slice(1)) {
+		const cols = line.split(',');
+		const name = cols[nameIdx]?.trim() ?? '';
+		if (!name) continue;
+		const origin = cols[originIdx]?.trim() ?? '';
+		const meaning = cols[meaningIdx]?.trim() ?? '';
+		out.set(name.toLowerCase(), { origin, meaning });
+	}
+	process.stderr.write(
+		`[build-names] BTN CSV ${file}: loaded ${out.size} records.\n`,
+	);
+	return out;
 }
 
 function loadBtnData(): Map<string, BtnRecord> {
@@ -230,7 +282,7 @@ function loadBtnData(): Map<string, BtnRecord> {
 	}
 
 	const files = readdirSync(btnDir).filter(
-		(f) => f.endsWith('.csv') || f.endsWith('.txt'),
+		(f) => f.endsWith('.json') || f.endsWith('.csv') || f.endsWith('.txt'),
 	);
 	if (files.length === 0) {
 		process.stderr.write(
@@ -239,11 +291,31 @@ function loadBtnData(): Map<string, BtnRecord> {
 		return result;
 	}
 
-	// Stub: parse BTN files when they are present.
-	// Actual parsing depends on the format of the BTN download; implement here
-	// once the maintainer decides how to source the data.
+	for (const file of files) {
+		const filePath = `${btnDir}/${file}`;
+		try {
+			const raw = readFileSync(filePath, 'utf8');
+			let parsed: Map<string, BtnRecord>;
+			if (file.endsWith('.json')) {
+				parsed = parseBtnJson(raw, file);
+			} else {
+				// .csv or .txt — treat as header-row CSV
+				parsed = parseBtnCsv(raw, file);
+			}
+			// Last-write-wins on duplicate name keys across files
+			for (const [key, record] of parsed) {
+				result.set(key, record);
+			}
+		} catch (err) {
+			process.stderr.write(
+				`[build-names] BTN parse error in ${file}: ${String(err)}\n`,
+			);
+			// Continue processing remaining files
+		}
+	}
+
 	process.stderr.write(
-		`[build-names] BTN files found (${files.join(', ')}); enrichment stub — not yet implemented.\n`,
+		`[build-names] BTN enrichment: ${result.size} records loaded from ${files.length} file(s).\n`,
 	);
 	return result;
 }
