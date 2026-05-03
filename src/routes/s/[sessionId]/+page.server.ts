@@ -40,15 +40,29 @@ export const load: PageServerLoad = async ({
 		sameSite: 'lax',
 	});
 
-	const [votes, postJoinMeta] = await Promise.all([
-		getVotes(platform.env.VOTES, params.sessionId, slug),
-		getSessionMeta(platform.env.VOTES, params.sessionId),
-	]);
+	// addPartner is idempotent — the post-join slug list is the prior list
+	// plus the joining slug if it wasn't already there. Avoids a second
+	// getSessionMeta round trip just to learn what we already know.
+	const partnerSlugs = meta.partnerSlugs.includes(slug)
+		? meta.partnerSlugs
+		: [...meta.partnerSlugs, slug];
+
+	const allPartnerVotes = await Promise.all(
+		partnerSlugs.map((s) => getVotes(platform.env.VOTES, params.sessionId, s)),
+	);
+
+	const partnerVoteCounts: Record<string, number> = {};
+	partnerSlugs.forEach((s, i) => {
+		partnerVoteCounts[s] = allPartnerVotes[i]?.votes.length ?? 0;
+	});
+
+	const myIndex = partnerSlugs.indexOf(slug);
 
 	return {
 		slug,
 		sessionId: params.sessionId,
-		votes: votes?.votes ?? [],
-		partnerSlugs: postJoinMeta?.partnerSlugs ?? [slug],
+		votes: allPartnerVotes[myIndex]?.votes ?? [],
+		partnerSlugs,
+		partnerVoteCounts,
 	};
 };

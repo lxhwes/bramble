@@ -371,6 +371,29 @@
 	const currentCard = $derived(names[deckIndex] ?? null);
 	const remaining = $derived(names.length - deckIndex);
 
+	// Snapshot-at-load partner progress hint. Compares the leading "other"
+	// partner to the current swiper. Returns null when there's no other
+	// partner or when everyone is tied (nothing meaningful to report).
+	const partnerProgressText = $derived.by(() => {
+		const counts = data.partnerVoteCounts;
+		if (!data.slug || counts === undefined) return null;
+		const others = (data.partnerSlugs ?? []).filter((s) => s !== data.slug);
+		if (others.length === 0) return null;
+		const myCount = counts[data.slug] ?? 0;
+		let leadSlug = others[0];
+		let leadCount = counts[leadSlug] ?? 0;
+		for (const s of others.slice(1)) {
+			const c = counts[s] ?? 0;
+			if (c > leadCount) {
+				leadSlug = s;
+				leadCount = c;
+			}
+		}
+		if (leadCount > myCount) return `${leadSlug} is +${leadCount - myCount}`;
+		if (myCount > leadCount) return `you're +${myCount - leadCount} ahead`;
+		return null;
+	});
+
 	// Background tint that ramps with drag distance to signal swipe direction.
 	const tint = $derived.by(() => {
 		if (!dragging && !snapping) return 'white';
@@ -502,13 +525,18 @@
 					<span class="text-gray-500">
 						swiping as <span class="font-medium text-gray-800">{data.slug}</span>
 					</span>
-					<a
-						href="/s/{data.sessionId}"
-						onclick={clearSavedSlug}
-						class="text-xs text-gray-400 underline hover:text-gray-600"
-					>
-						switch
-					</a>
+					<div class="flex items-center gap-2 text-xs text-gray-400">
+						<a
+							href="/s/{data.sessionId}"
+							onclick={clearSavedSlug}
+							class="underline hover:text-gray-600"
+						>
+							switch
+						</a>
+						{#if partnerProgressText !== null}
+							<span aria-live="polite">· {partnerProgressText}</span>
+						{/if}
+					</div>
 				</div>
 				<div class="flex items-center gap-2">
 					<button
