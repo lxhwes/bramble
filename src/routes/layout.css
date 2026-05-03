@@ -1,1 +1,41 @@
 @import 'tailwindcss';
+
+@theme {
+	/* Coral — primary brand */
+	--color-coral-50: oklch(97% 0.03 28);
+	--color-coral-100: oklch(90% 0.06 28);
+	--color-coral-200: oklch(80% 0.1 28);
+	--color-coral-300: oklch(72% 0.13 28);
+	--color-coral-400: oklch(65% 0.15 28);
+	--color-coral-500: oklch(58% 0.16 28);
+	--color-coral-600: oklch(53% 0.16 28);
+	--color-coral-700: oklch(48% 0.15 28);
+	--color-coral-800: oklch(40% 0.14 28);
+	--color-coral-900: oklch(32% 0.12 28);
+
+	/* Sage — secondary/foliage */
+	--color-sage-50: oklch(95% 0.02 160);
+	--color-sage-100: oklch(88% 0.04 160);
+	--color-sage-200: oklch(76% 0.06 160);
+	--color-sage-300: oklch(64% 0.08 160);
+	--color-sage-400: oklch(54% 0.08 160);
+	--color-sage-500: oklch(47% 0.09 162);
+	--color-sage-600: oklch(40% 0.1 165);
+	--color-sage-700: oklch(34% 0.08 165);
+	--color-sage-800: oklch(28% 0.06 160);
+	--color-sage-900: oklch(22% 0.06 160);
+
+	/* Teal — yes/match swipe */
+	--color-teal-500: oklch(55% 0.13 170);
+
+	/* Font */
+	--font-sans: 'DM Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+@layer base {
+	body {
+		font-family: var(--font-sans);
+		background-color: oklch(98% 0.012 75);
+		color: var(--color-sage-900);
+	}
+}

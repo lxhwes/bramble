@@ -34,7 +34,7 @@
 			id="filter-gender"
 			value={state.gender}
 			onchange={handleGender}
-			class="rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600 focus:border-indigo-400 focus:outline-none"
+			class="rounded border border-coral-200 bg-white px-2 py-1 text-xs text-gray-600 focus:border-coral-500 focus:outline-none"
 		>
 			<option value="both">Both</option>
 			<option value="m">Boys</option>
@@ -48,7 +48,7 @@
 			id="filter-era"
 			value={state.era}
 			onchange={handleEra}
-			class="rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600 focus:border-indigo-400 focus:outline-none"
+			class="rounded border border-coral-200 bg-white px-2 py-1 text-xs text-gray-600 focus:border-coral-500 focus:outline-none"
 		>
 			<option value="any">Any era</option>
 			<option value="1990s">1990s</option>
@@ -64,7 +64,7 @@
 			id="filter-pop"
 			value={state.pop}
 			onchange={handlePop}
-			class="rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600 focus:border-indigo-400 focus:outline-none"
+			class="rounded border border-coral-200 bg-white px-2 py-1 text-xs text-gray-600 focus:border-coral-500 focus:outline-none"
 		>
 			<option value="any">Any pop.</option>
 			<option value="rare">Rare</option>
@@ -79,7 +79,7 @@
 			id="filter-start"
 			value={state.startsWith ?? ''}
 			onchange={handleStart}
-			class="rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600 focus:border-indigo-400 focus:outline-none"
+			class="rounded border border-coral-200 bg-white px-2 py-1 text-xs text-gray-600 focus:border-coral-500 focus:outline-none"
 		>
 			<option value="">Any letter</option>
 			{#each letters as letter}

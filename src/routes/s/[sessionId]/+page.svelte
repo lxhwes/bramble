@@ -373,20 +373,20 @@
 
 	// Background tint that ramps with drag distance to signal swipe direction.
 	const tint = $derived.by(() => {
-		if (!dragging && !snapping) return 'transparent';
+		if (!dragging && !snapping) return 'white';
 		const ax = Math.min(Math.abs(dx) / 200, 1);
 		const ay = Math.min(Math.abs(dy) / 200, 1);
 		if (dy <= -80) {
 			// Blue tint when pulling up past super threshold.
 			return `rgba(56, 189, 248, ${Math.max(ay, 0.4)})`;
 		}
-		if (dx >= 80) return `rgba(34, 197, 94, ${Math.max(ax, 0.4)})`;
-		if (dx <= -80) return `rgba(244, 63, 94, ${Math.max(ax, 0.4)})`;
+		if (dx >= 80) return `rgba(70, 130, 105, ${Math.max(ax, 0.4)})`;
+		if (dx <= -80) return `rgba(220, 100, 80, ${Math.max(ax, 0.4)})`;
 		// In the pre-threshold range — gentle hint without committing.
 		if (Math.abs(dx) > 0) {
 			return dx > 0
-				? `rgba(34, 197, 94, ${ax * 0.3})`
-				: `rgba(244, 63, 94, ${ax * 0.3})`;
+				? `rgba(70, 130, 105, ${ax * 0.3})`
+				: `rgba(220, 100, 80, ${ax * 0.3})`;
 		}
 		if (dy < 0) return `rgba(56, 189, 248, ${ay * 0.3})`;
 		return 'transparent';
@@ -471,17 +471,17 @@
 				oninput={() => {
 					joinError = null;
 				}}
-				class="rounded-lg border border-gray-300 px-4 py-2 text-center text-lg focus:border-indigo-500 focus:outline-none"
+				class="rounded-lg border border-gray-300 px-4 py-2 text-center text-lg focus:border-sage-500 focus:outline-none"
 			/>
 			<button
 				type="submit"
-				class="rounded-lg bg-indigo-600 px-6 py-2 text-white hover:bg-indigo-700 active:bg-indigo-800"
+				class="rounded-lg bg-sage-600 px-6 py-2 text-white hover:bg-sage-700 active:bg-sage-800"
 			>
 				Join
 			</button>
 		</form>
 		{#if joinError !== null}
-			<p class="text-sm text-rose-600" role="alert">{joinError}</p>
+			<p class="text-sm text-coral-600" role="alert">{joinError}</p>
 		{/if}
 		{#if (data.partnerSlugs ?? []).length === 0}
 			<p class="text-sm text-gray-400">You're the first one in.</p>
@@ -549,7 +549,7 @@
 				<!-- Card -->
 				<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 				<article
-					class="aspect-[4/5] max-h-[60vh] w-[80vw] max-w-[80vw] cursor-grab select-none flex-col items-center justify-center gap-2 rounded-2xl border border-gray-200 shadow-2xl active:cursor-grabbing sm:w-80"
+					class="aspect-[4/5] max-h-[60vh] w-[80vw] max-w-[80vw] cursor-grab select-none flex-col items-center justify-center gap-2 rounded-2xl border border-coral-100 shadow-xl active:cursor-grabbing sm:w-80"
 					style="display: flex; transform: translateX({dx}px) translateY({dy}px) rotate({dx * 0.05}deg); background-color: {tint}; transition: {snapping ? 'transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1), background-color 100ms ease' : 'background-color 100ms ease'};"
 					onpointerdown={onPointerDown}
 					onpointermove={onPointerMove}
@@ -567,7 +567,7 @@
 						type="button"
 						onclick={() => recordVote('no')}
 						aria-label="No"
-						class="flex h-16 w-16 items-center justify-center rounded-full border-2 border-rose-500 bg-white text-2xl text-rose-500 shadow-md transition-transform hover:bg-rose-50 active:scale-95"
+						class="flex h-16 w-16 items-center justify-center rounded-full border-2 border-coral-500 bg-white text-2xl text-coral-500 shadow-md transition-transform hover:bg-coral-50 active:scale-95"
 					>
 						✕
 					</button>
@@ -583,7 +583,7 @@
 						type="button"
 						onclick={() => recordVote('yes')}
 						aria-label="Yes"
-						class="flex h-16 w-16 items-center justify-center rounded-full border-2 border-emerald-500 bg-white text-2xl text-emerald-500 shadow-md transition-transform hover:bg-emerald-50 active:scale-95"
+						class="flex h-16 w-16 items-center justify-center rounded-full border-2 border-sage-700 bg-white text-2xl text-sage-700 shadow-md transition-transform hover:bg-sage-100 active:scale-95"
 					>
 						♥
 					</button>

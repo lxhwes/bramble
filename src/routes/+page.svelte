@@ -13,7 +13,7 @@
 	{#if data.lastSession}
 		<a
 			href="/s/{data.lastSession}"
-			class="rounded-2xl border border-rose-300 bg-rose-50 px-6 py-3 text-rose-700 shadow-sm hover:bg-rose-100 active:bg-rose-200"
+			class="rounded-2xl border border-coral-300 bg-coral-50 px-6 py-3 text-coral-700 shadow-sm hover:bg-coral-100 active:bg-coral-200"
 		>
 			Resume your session
 		</a>
@@ -22,7 +22,7 @@
 	<form method="POST">
 		<button
 			type="submit"
-			class="rounded-2xl bg-rose-500 px-8 py-4 text-xl font-semibold text-white shadow-md transition-colors hover:bg-rose-600 active:bg-rose-700"
+			class="rounded-2xl bg-coral-500 px-8 py-4 text-xl font-semibold text-white shadow-md transition-colors hover:bg-coral-600 active:bg-coral-700"
 		>
 			Start a session
 		</button>
