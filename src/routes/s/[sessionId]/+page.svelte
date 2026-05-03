@@ -1,15 +1,15 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import type { PageData } from './$types';
-
-	interface NameEntry {
-		name: string;
-		sex: 'M' | 'F';
-		peakYear: number;
-		totalCount: number;
-		origin?: string;
-		meaning?: string;
-	}
+	import FilterBar from '$lib/components/FilterBar.svelte';
+	import {
+		applyFilters,
+		parseFilters,
+		serializeFilters,
+		type FilterState,
+		type NameEntry,
+	} from '$lib/filters';
 
 	interface PendingVote {
 		name: string;
@@ -36,10 +36,18 @@
 	// ---------------------------------------------------------------------------
 	// Deck state
 	// ---------------------------------------------------------------------------
-	let names: NameEntry[] = $state([]);
+	let rawNames: NameEntry[] = $state([]);
 	let deckIndex = $state(0);
 	let pending: PendingVote[] = $state([]);
 	let flushing = $state(false);
+
+	const filterState = $derived<FilterState>(parseFilters(page.url.searchParams));
+
+	const names = $derived(
+		rawNames.length === 0
+			? []
+			: applyFilters(shuffle(rawNames, hashString(data.sessionId)), filterState),
+	);
 
 	// ---------------------------------------------------------------------------
 	// Deterministic shuffle — mulberry32 PRNG + string-to-uint32 hash
@@ -179,13 +187,26 @@
 	// ---------------------------------------------------------------------------
 
 	$effect(() => {
+		// Reset deck index whenever filters change so the user sees results from position 0.
+		JSON.stringify(filterState);
+		deckIndex = 0;
+	});
+
+	function updateFilters(next: FilterState) {
+		const params = serializeFilters(next);
+		if (data.slug) params.set('p', data.slug);
+		const qs = params.toString();
+		const url = qs ? `?${qs}` : window.location.pathname;
+		goto(url, { replaceState: true, keepFocus: true, noScroll: true });
+	}
+
+	$effect(() => {
 		if (!data.slug) return;
 
 		fetch('/names.json')
 			.then((r) => r.json())
 			.then((raw: unknown) => {
-				const seed = hashString(data.sessionId);
-				names = shuffle(raw as NameEntry[], seed);
+				rawNames = raw as NameEntry[];
 			})
 			.catch(() => {});
 
@@ -240,6 +261,8 @@
 	<!-- Swipe deck -->
 	<main class="flex min-h-screen flex-col items-center justify-between p-4">
 		<div class="flex w-full max-w-sm flex-col items-center gap-6 pt-8">
+			<FilterBar state={filterState} onchange={updateFilters} />
+
 			{#if currentCard !== null}
 				<!-- Card -->
 				<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
