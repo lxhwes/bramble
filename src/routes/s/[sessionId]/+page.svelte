@@ -174,6 +174,8 @@
 	let dx = $state(0);
 	let dy = $state(0);
 	let snapping = $state(false);
+	// Timestamp captured on pointerdown; used to distinguish tap from drag.
+	let pointerStartTs = $state(0);
 
 	function onPointerDown(e: PointerEvent) {
 		dragging = true;
@@ -182,6 +184,7 @@
 		startY = e.clientY;
 		dx = 0;
 		dy = 0;
+		pointerStartTs = e.timeStamp;
 		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 	}
 
@@ -191,9 +194,19 @@
 		dy = e.clientY - startY;
 	}
 
-	function onPointerUp() {
+	function onPointerUp(e: PointerEvent) {
 		if (!dragging) return;
 		dragging = false;
+		// A tap is a short, stationary pointer gesture — distinct from a drag swipe.
+		const dt = e.timeStamp - pointerStartTs;
+		const isTap = Math.abs(dx) < 5 && Math.abs(dy) < 5 && dt < 250;
+		if (isTap) {
+			openDetail();
+			dragging = false;
+			dx = 0;
+			dy = 0;
+			return; // do NOT fall through to swipe-decision
+		}
 		if (Math.abs(dx) >= 80) {
 			recordVote(dx > 0 ? 'yes' : 'no');
 			dx = 0;
@@ -208,6 +221,49 @@
 			dx = 0;
 			dy = 0;
 		}
+	}
+
+	// ---------------------------------------------------------------------------
+	// Name detail bottom-sheet
+	// ---------------------------------------------------------------------------
+	let detailEntry: NameEntry | null = $state(null);
+	let detailDialog: HTMLDialogElement | null = $state(null);
+
+	function openDetail() {
+		const entry = names[deckIndex];
+		if (!entry) return;
+		detailEntry = entry;
+		detailDialog?.showModal();
+	}
+
+	function closeDetail() {
+		detailDialog?.close();
+		detailEntry = null;
+	}
+
+	// Clicks on the dialog element where target === currentTarget are backdrop clicks.
+	function onDialogClick(e: MouseEvent) {
+		if (e.target === e.currentTarget) closeDetail();
+	}
+
+	// Swipe-down handler wired to the drag-handle only so content interactions are unaffected.
+	let sheetDragStartY = $state(0);
+	let sheetDragDy = $state(0);
+
+	function onSheetPointerDown(e: PointerEvent) {
+		sheetDragStartY = e.clientY;
+		sheetDragDy = 0;
+		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+	}
+
+	function onSheetPointerMove(e: PointerEvent) {
+		if (!e.currentTarget) return;
+		sheetDragDy = e.clientY - sheetDragStartY;
+	}
+
+	function onSheetPointerUp() {
+		if (sheetDragDy >= 60) closeDetail();
+		sheetDragDy = 0;
 	}
 
 	// ---------------------------------------------------------------------------
@@ -388,4 +444,44 @@
 			Link copied
 		</div>
 	{/if}
+
+	<!-- Name detail bottom-sheet -->
+	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+	<dialog
+		bind:this={detailDialog}
+		onclick={onDialogClick}
+		onclose={closeDetail}
+		aria-label="Name details"
+		class="m-0 mt-auto max-h-[80vh] w-full max-w-md rounded-t-2xl bg-white p-0 shadow-2xl backdrop:bg-black/40 sm:mx-auto sm:mb-auto sm:rounded-2xl"
+	>
+		{#if detailEntry !== null}
+			<!-- Drag handle — pointer handlers live here only, not on the full sheet -->
+			<div
+				role="presentation"
+				onpointerdown={onSheetPointerDown}
+				onpointermove={onSheetPointerMove}
+				onpointerup={onSheetPointerUp}
+				class="cursor-grab pt-2 pb-1 active:cursor-grabbing"
+			>
+				<div class="mx-auto h-1.5 w-12 rounded-full bg-gray-300"></div>
+			</div>
+			<div class="flex flex-col gap-3 px-6 pb-6">
+				<h2 class="text-center text-4xl font-bold tracking-tight">{detailEntry.name}</h2>
+				<p class="text-center text-2xl text-gray-400" aria-label={detailEntry.sex === 'M' ? 'boy' : 'girl'}>
+					{detailEntry.sex === 'M' ? '♂' : '♀'}
+					<span class="ml-1 text-base text-gray-500">{detailEntry.sex === 'M' ? 'Boy' : 'Girl'}</span>
+				</p>
+				<dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+					<dt class="font-medium text-gray-500">Peak year</dt>
+					<dd class="text-gray-900">{detailEntry.peakYear}</dd>
+					<dt class="font-medium text-gray-500">Total count</dt>
+					<dd class="text-gray-900">{detailEntry.totalCount.toLocaleString()}</dd>
+					<dt class="font-medium text-gray-500">Origin</dt>
+					<dd class="text-gray-900">{detailEntry.origin ?? '—'}</dd>
+					<dt class="col-span-2 font-medium text-gray-500">Meaning</dt>
+					<dd class="col-span-2 text-gray-900">{detailEntry.meaning ?? '—'}</dd>
+				</dl>
+			</div>
+		{/if}
+	</dialog>
 {/if}
