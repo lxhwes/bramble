@@ -323,6 +323,27 @@
 	const currentCard = $derived(names[deckIndex] ?? null);
 	const remaining = $derived(names.length - deckIndex);
 
+	// Background tint that ramps with drag distance to signal swipe direction.
+	const tint = $derived.by(() => {
+		if (!dragging && !snapping) return 'transparent';
+		const ax = Math.min(Math.abs(dx) / 200, 1);
+		const ay = Math.min(Math.abs(dy) / 200, 1);
+		if (dy <= -80) {
+			// Blue tint when pulling up past super threshold.
+			return `rgba(56, 189, 248, ${Math.max(ay, 0.4)})`;
+		}
+		if (dx >= 80) return `rgba(34, 197, 94, ${Math.max(ax, 0.4)})`;
+		if (dx <= -80) return `rgba(244, 63, 94, ${Math.max(ax, 0.4)})`;
+		// In the pre-threshold range — gentle hint without committing.
+		if (Math.abs(dx) > 0) {
+			return dx > 0
+				? `rgba(34, 197, 94, ${ax * 0.3})`
+				: `rgba(244, 63, 94, ${ax * 0.3})`;
+		}
+		if (dy < 0) return `rgba(56, 189, 248, ${ay * 0.3})`;
+		return 'transparent';
+	});
+
 	// ---------------------------------------------------------------------------
 	// Share + switch partner
 	// ---------------------------------------------------------------------------
@@ -391,16 +412,14 @@
 				<!-- Card -->
 				<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 				<article
-					class="flex h-72 w-full cursor-grab select-none flex-col items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white shadow-md active:cursor-grabbing"
-					style="transform: translateX({dx}px) rotate({dx * 0.05}deg); transition: {snapping
-						? 'transform 0.2s ease'
-						: 'none'};"
+					class="aspect-[4/5] max-h-[60vh] w-[80vw] max-w-[80vw] cursor-grab select-none flex-col items-center justify-center gap-2 rounded-2xl border border-gray-200 shadow-2xl active:cursor-grabbing sm:w-80"
+					style="display: flex; transform: translateX({dx}px) translateY({dy}px) rotate({dx * 0.05}deg); background-color: {tint}; transition: {snapping ? 'transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1), background-color 100ms ease' : 'background-color 100ms ease'};"
 					onpointerdown={onPointerDown}
 					onpointermove={onPointerMove}
 					onpointerup={onPointerUp}
 				>
-					<span class="text-5xl font-bold tracking-tight">{currentCard.name}</span>
-					<span class="text-2xl text-gray-400" aria-label={currentCard.sex === 'M' ? 'boy' : 'girl'}>
+					<span class="text-6xl font-extrabold tracking-wide">{currentCard.name}</span>
+					<span class="text-3xl text-gray-400" aria-label={currentCard.sex === 'M' ? 'boy' : 'girl'}>
 						{currentCard.sex === 'M' ? '♂' : '♀'}
 					</span>
 				</article>

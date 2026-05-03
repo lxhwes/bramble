@@ -40,12 +40,16 @@
 				<li>
 					<button
 						type="button"
-						class="flex w-full items-center gap-2 py-3 text-left hover:bg-slate-50 active:bg-slate-100"
+						class="flex w-full items-center gap-3 px-3 py-4 text-left hover:bg-slate-50 active:bg-slate-100"
 						onclick={() => dismiss(match.name, match.sex)}
 					>
-						<span class="text-base font-medium">{match.name}</span>
-						<span class="text-slate-400" aria-label={match.sex === 'M' ? 'male' : 'female'}>
-							{match.sex === 'M' ? '♂' : '♀'}
+						<span class="text-lg font-semibold text-slate-900">{match.name}</span>
+						<span
+							class="rounded-full px-2 py-0.5 text-xs font-medium {match.sex === 'M'
+								? 'bg-blue-100 text-blue-700'
+								: 'bg-pink-100 text-pink-700'}"
+						>
+							{match.sex === 'M' ? 'boy' : 'girl'}
 						</span>
 						<span class="ml-auto text-xs text-slate-400">tap to dismiss</span>
 					</button>
