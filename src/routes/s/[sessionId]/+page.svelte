@@ -25,12 +25,35 @@
 	// Join form (slug is null)
 	// ---------------------------------------------------------------------------
 	let joinInput = $state('');
+	let joinError = $state<string | null>(null);
+
+	// Per-session localStorage key. Survives reloads so a returning partner
+	// doesn't have to retype their slug; cleared by Switch Partner.
+	const slugStorageKey = $derived(`bramble_slug:${data.sessionId}`);
 
 	function handleJoinSubmit(e: Event) {
 		e.preventDefault();
 		const val = joinInput.trim().toLowerCase();
-		if (/^[a-z0-9-]{1,32}$/.test(val)) {
-			goto(`?p=${encodeURIComponent(val)}`);
+		if (!/^[a-z0-9-]{1,32}$/.test(val)) {
+			joinError = 'Use lowercase letters, numbers, or dashes (1–32 chars).';
+			return;
+		}
+		// Collision: another partner already claimed this slug, and our localStorage
+		// doesn't hold it (so we are not the original claimant resuming).
+		const saved =
+			typeof localStorage !== 'undefined' ? localStorage.getItem(slugStorageKey) : null;
+		const partnerSlugs = data.partnerSlugs ?? [];
+		if (partnerSlugs.includes(val) && saved !== val) {
+			joinError = `“${val}” is already taken in this session — pick another.`;
+			return;
+		}
+		joinError = null;
+		goto(`?p=${encodeURIComponent(val)}`);
+	}
+
+	function clearSavedSlug() {
+		if (typeof localStorage !== 'undefined') {
+			localStorage.removeItem(slugStorageKey);
 		}
 	}
 
@@ -295,7 +318,25 @@
 	}
 
 	$effect(() => {
+		// Pre-fill the join form from localStorage when no slug is in the URL.
+		// Wrap reads/writes in untrack so the effect runs once per slug-state change,
+		// not on every keystroke (joinInput is reactive — see svelte5_effect_loops note).
+		if (data.slug !== null) return;
+		if (typeof localStorage === 'undefined') return;
+		const saved = localStorage.getItem(slugStorageKey);
+		if (saved === null) return;
+		untrack(() => {
+			if (joinInput === '') joinInput = saved;
+		});
+	});
+
+	$effect(() => {
 		if (!data.slug) return;
+
+		// Persist the slug for this session so reloads don't need ?p=.
+		if (typeof localStorage !== 'undefined') {
+			localStorage.setItem(slugStorageKey, data.slug);
+		}
 
 		fetch('/names.json')
 			.then((r) => r.json())
@@ -382,6 +423,9 @@
 				placeholder="your-name"
 				pattern={'[a-z0-9-]{1,32}'}
 				required
+				oninput={() => {
+					joinError = null;
+				}}
 				class="rounded-lg border border-gray-300 px-4 py-2 text-center text-lg focus:border-indigo-500 focus:outline-none"
 			/>
 			<button
@@ -391,19 +435,36 @@
 				Join
 			</button>
 		</form>
+		{#if joinError !== null}
+			<p class="text-sm text-rose-600" role="alert">{joinError}</p>
+		{/if}
+		{#if (data.partnerSlugs ?? []).length === 0}
+			<p class="text-sm text-gray-400">You're the first one in.</p>
+		{:else}
+			<p class="text-sm text-gray-500">
+				{(data.partnerSlugs ?? []).length} already here:
+				<span class="font-medium text-gray-700">{(data.partnerSlugs ?? []).join(', ')}</span>
+			</p>
+		{/if}
 	</main>
 {:else}
 	<!-- Swipe deck -->
 	<main class="flex min-h-screen flex-col items-center justify-between p-4">
 		<div class="flex w-full max-w-sm flex-col items-center gap-6 pt-8">
-			<!-- Toolbar: switch partner (left) + share (right) -->
+			<!-- Toolbar: identity (left) + share (right) -->
 			<div class="flex w-full items-center justify-between gap-3">
-				<a
-					href="/s/{data.sessionId}"
-					class="text-sm text-gray-500 underline hover:text-gray-700"
-				>
-					Switch partner
-				</a>
+				<div class="flex flex-col text-sm leading-tight">
+					<span class="text-gray-500">
+						swiping as <span class="font-medium text-gray-800">{data.slug}</span>
+					</span>
+					<a
+						href="/s/{data.sessionId}"
+						onclick={clearSavedSlug}
+						class="text-xs text-gray-400 underline hover:text-gray-600"
+					>
+						switch
+					</a>
+				</div>
 				<button
 					type="button"
 					onclick={share}

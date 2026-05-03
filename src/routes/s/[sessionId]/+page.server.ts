@@ -20,12 +20,24 @@ export const load: PageServerLoad = async ({ params, url, platform }) => {
 	}
 
 	if (!slugValid) {
-		return { slug: null, sessionId: params.sessionId };
+		return {
+			slug: null,
+			sessionId: params.sessionId,
+			partnerSlugs: meta.partnerSlugs,
+		};
 	}
 
 	await addPartner(platform.env.VOTES, params.sessionId, slug);
 
-	const votes = await getVotes(platform.env.VOTES, params.sessionId, slug);
+	const [votes, postJoinMeta] = await Promise.all([
+		getVotes(platform.env.VOTES, params.sessionId, slug),
+		getSessionMeta(platform.env.VOTES, params.sessionId),
+	]);
 
-	return { slug, sessionId: params.sessionId, votes: votes?.votes ?? [] };
+	return {
+		slug,
+		sessionId: params.sessionId,
+		votes: votes?.votes ?? [],
+		partnerSlugs: postJoinMeta?.partnerSlugs ?? [slug],
+	};
 };
