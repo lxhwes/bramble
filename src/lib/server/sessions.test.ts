@@ -140,7 +140,11 @@ describe('sessions.ts', () => {
 
 		const result = await getMatches(kv, id);
 		expect(result.matches).toHaveLength(1);
-		expect(result.matches[0]).toEqual({ name: 'Aaden', sex: 'M' });
+		expect(result.matches[0]).toEqual({
+			name: 'Aaden',
+			sex: 'M',
+			superSlugs: [],
+		});
 	});
 
 	it('getMatches treats super as yes for matching purposes', async () => {
@@ -155,6 +159,47 @@ describe('sessions.ts', () => {
 		const result = await getMatches(kv, id);
 		expect(result.matches).toHaveLength(1);
 		expect(result.matches[0].name).toBe('Aaden');
+	});
+
+	it('getMatches lists the slug of a single partner who super-liked the match', async () => {
+		const { kv } = mockKv();
+		const id = await createSession(kv);
+		await addPartner(kv, id, 'alex');
+		await addPartner(kv, id, 'laura');
+
+		// alex super-likes; laura just likes
+		await appendVotes(kv, id, 'alex', [makeVote('Aaden', 'M', 'super')]);
+		await appendVotes(kv, id, 'laura', [makeVote('Aaden', 'M', 'yes')]);
+
+		const result = await getMatches(kv, id);
+		expect(result.matches[0].superSlugs).toEqual(['alex']);
+	});
+
+	it('getMatches lists every slug when all partners super-liked the match', async () => {
+		const { kv } = mockKv();
+		const id = await createSession(kv);
+		await addPartner(kv, id, 'alex');
+		await addPartner(kv, id, 'laura');
+
+		await appendVotes(kv, id, 'alex', [makeVote('Aaden', 'M', 'super')]);
+		await appendVotes(kv, id, 'laura', [makeVote('Aaden', 'M', 'super')]);
+
+		const result = await getMatches(kv, id);
+		// Sorted to keep the assertion stable regardless of partner iteration order.
+		expect([...result.matches[0].superSlugs].sort()).toEqual(['alex', 'laura']);
+	});
+
+	it('getMatches returns superSlugs:[] when nobody super-liked the match', async () => {
+		const { kv } = mockKv();
+		const id = await createSession(kv);
+		await addPartner(kv, id, 'alex');
+		await addPartner(kv, id, 'laura');
+
+		await appendVotes(kv, id, 'alex', [makeVote('Aaden', 'M', 'yes')]);
+		await appendVotes(kv, id, 'laura', [makeVote('Aaden', 'M', 'yes')]);
+
+		const result = await getMatches(kv, id);
+		expect(result.matches[0].superSlugs).toEqual([]);
 	});
 
 	it('getMatches returns empty matches when there is only one partner', async () => {

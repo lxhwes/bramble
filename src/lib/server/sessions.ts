@@ -129,7 +129,8 @@ export async function appendVotes(
 
 /**
  * Computes the set of names that every known partner in the session voted
- * 'yes' or 'super' on.
+ * 'yes' or 'super' on. For each match, `superSlugs` lists the partners who
+ * specifically voted 'super' on that name (subset of partnerSlugs).
  *
  * If the session has fewer than 2 partners, matches is always an empty array
  * because there is no one to match with.
@@ -139,7 +140,7 @@ export async function getMatches(
 	sessionId: string,
 ): Promise<{
 	partnerSlugs: string[];
-	matches: Array<{ name: string; sex: 'M' | 'F' }>;
+	matches: Array<{ name: string; sex: 'M' | 'F'; superSlugs: string[] }>;
 }> {
 	const meta = await getSessionMeta(kv, sessionId);
 	if (meta === null || meta.partnerSlugs.length < 2) {
@@ -154,30 +155,38 @@ export async function getMatches(
 		meta.partnerSlugs.map((slug) => getVotes(kv, sessionId, slug)),
 	);
 
-	// Build a set of "name|sex" keys that each partner liked (yes or super).
+	// Build a set of "name|sex" keys that each partner liked (yes or super)
+	// and a parallel set of keys that each partner specifically super-liked.
 	// A name must appear in every partner's liked set to be a match.
 	const likedSets = allVotes.map((pv) => {
 		const liked = new Set<string>();
+		const supered = new Set<string>();
 		if (pv !== null) {
 			for (const entry of pv.votes) {
 				if (entry.vote === 'yes' || entry.vote === 'super') {
 					liked.add(`${entry.name}|${entry.sex}`);
 				}
+				if (entry.vote === 'super') {
+					supered.add(`${entry.name}|${entry.sex}`);
+				}
 			}
 		}
-		return liked;
+		return { liked, supered };
 	});
 
 	// Intersect: start from the first set and keep only keys present in all.
 	const [first, ...rest] = likedSets;
 	const intersection = new Set<string>(
-		[...first].filter((key) => rest.every((s) => s.has(key))),
+		[...first.liked].filter((key) => rest.every((s) => s.liked.has(key))),
 	);
 
 	const matches = [...intersection].map((key) => {
 		const [name, sex] = key.split('|');
 		// The key was constructed as `${name}|${'M'|'F'}` so sex is always valid.
-		return { name, sex: sex as 'M' | 'F' };
+		const superSlugs = meta.partnerSlugs.filter((_, i) =>
+			likedSets[i].supered.has(key),
+		);
+		return { name, sex: sex as 'M' | 'F', superSlugs };
 	});
 
 	return { partnerSlugs: meta.partnerSlugs, matches };

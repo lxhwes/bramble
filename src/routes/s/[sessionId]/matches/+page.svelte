@@ -51,6 +51,15 @@
 						>
 							{match.sex === 'M' ? 'boy' : 'girl'}
 						</span>
+						{#if match.superSlugs.length > 0}
+							<span
+								class="text-sky-500"
+								aria-label="Super-liked by {match.superSlugs.join(', ')}"
+								title="Super-liked by {match.superSlugs.join(', ')}"
+							>
+								★
+							</span>
+						{/if}
 						<span class="ml-auto text-xs text-slate-400">tap to dismiss</span>
 					</button>
 				</li>
