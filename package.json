@@ -11,6 +11,7 @@
 		"check": "wrangler types --check && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"gen": "wrangler types",
+		"build:names": "tsx scripts/build-names.ts",
 		"lint": "biome check .",
 		"format": "biome format --write ."
 	},
@@ -23,6 +24,7 @@
 		"svelte": "^5.55.2",
 		"svelte-check": "^4.4.6",
 		"tailwindcss": "^4.2.2",
+		"tsx": "^4.21.0",
 		"typescript": "^6.0.2",
 		"vite": "^8.0.7",
 		"wrangler": "^4.81.0"
