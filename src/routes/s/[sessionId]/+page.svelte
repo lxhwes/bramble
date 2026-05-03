@@ -39,6 +39,8 @@
 	let rawNames: NameEntry[] = $state([]);
 	let deckIndex = $state(0);
 	let pending: PendingVote[] = $state([]);
+	// Votes held locally before graduation; user can undo anything still here.
+	let undoStack: PendingVote[] = $state([]);
 	let flushing = $state(false);
 
 	const filterState = $derived<FilterState>(parseFilters(page.url.searchParams));
@@ -118,8 +120,10 @@
 	}
 
 	function beaconFlush() {
-		if (pending.length === 0 || !data.slug) return;
-		const body = JSON.stringify({ slug: data.slug, votes: pending });
+		if (pending.length === 0 && undoStack.length === 0) return;
+		if (!data.slug) return;
+		// On tab close, any votes still in the undoStack are real (not undone) — merge them in.
+		const body = JSON.stringify({ slug: data.slug, votes: [...pending, ...undoStack] });
 		if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
 			navigator.sendBeacon(
 				`/s/${data.sessionId}/vote`,
@@ -138,11 +142,27 @@
 	function recordVote(vote: 'yes' | 'no' | 'super') {
 		const entry = names[deckIndex];
 		if (!entry) return;
-		pending = [...pending, { name: entry.name, sex: entry.sex, vote, ts: Date.now() }];
+		const newVote: PendingVote = { name: entry.name, sex: entry.sex, vote, ts: Date.now() };
+		const nextStack = [...undoStack, newVote];
+		// Oldest vote graduates to the flush queue once the stack exceeds its 5-slot capacity.
+		if (nextStack.length > 5) {
+			const [graduated, ...rest] = nextStack;
+			pending = [...pending, graduated];
+			undoStack = rest;
+		} else {
+			undoStack = nextStack;
+		}
 		deckIndex += 1;
 		if (pending.length >= 10) {
 			flush();
 		}
+	}
+
+	function undo() {
+		if (undoStack.length === 0) return;
+		// Discard the most recent vote; it was never sent so no server-side delete needed.
+		undoStack = undoStack.slice(0, -1);
+		deckIndex -= 1;
 	}
 
 	// ---------------------------------------------------------------------------
@@ -196,7 +216,10 @@
 
 	$effect(() => {
 		// Reset deck index whenever filters change so the user sees results from position 0.
+		// Graduate any pending-undo votes first — they're real swipes against the old filter set.
 		JSON.stringify(filterState);
+		pending = [...pending, ...undoStack];
+		undoStack = [];
 		deckIndex = 0;
 	});
 
@@ -224,6 +247,7 @@
 			if (e.key === 'ArrowLeft') recordVote('no');
 			else if (e.key === 'ArrowRight') recordVote('yes');
 			else if (e.key === 'ArrowUp') recordVote('super');
+			else if (e.key.toLowerCase() === 'z') undo();
 		}
 
 		function onBeforeUnload() {
@@ -293,6 +317,16 @@
 				<p class="text-sm text-gray-400">
 					← no &nbsp;|&nbsp; yes → &nbsp;|&nbsp; ↑ super
 				</p>
+
+				<button
+					type="button"
+					onclick={undo}
+					disabled={undoStack.length === 0}
+					aria-label="Undo last swipe"
+					class="rounded-md border border-gray-300 px-3 py-1 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-30"
+				>
+					Undo (Z)
+				</button>
 
 				<p class="text-xs text-gray-300">{remaining} remaining</p>
 			{:else if names.length > 0}
