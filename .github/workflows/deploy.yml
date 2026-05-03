@@ -1,0 +1,57 @@
+# Prerequisites (maintainer must complete before first deploy):
+#
+# 1. Create a Cloudflare Pages project named "bramble" in the dashboard.
+#
+# 2. Create KV namespaces and update wrangler.toml:
+#      wrangler kv namespace create VOTES
+#      wrangler kv namespace create VOTES --preview
+#    Replace the placeholder IDs in wrangler.toml with the real namespace IDs.
+#
+# 3. Add GitHub Actions secrets to this repository:
+#      CLOUDFLARE_API_TOKEN  — API token with Pages:Edit permission
+#      CLOUDFLARE_ACCOUNT_ID — your Cloudflare account ID
+#
+# 4. CNAME setup (bramble.<yourdomain>) is a separate manual step in the
+#    Cloudflare dashboard — not automated here.
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: pnpm/action-setup@a7487ba4cd5e3c3b2c5b9e67c47b40e2dcd1f5b0 # v4.1.0
+        with:
+          version: "10.18"
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
+
+      - run: pnpm check
+
+      - run: pnpm build
+
+      - uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy .svelte-kit/cloudflare --project-name=bramble --branch=main --commit-dirty=true
