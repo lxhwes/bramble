@@ -29,7 +29,7 @@
 	</form>
 
 	<p class="max-w-sm text-center text-sm text-gray-400">
-		After starting, share the URL with your partner — they'll join by opening it and adding
-		<code class="font-mono">?p=their-name</code> to pick their own name.
+		After starting, share the URL with your partner — both of you pick a name on the join screen
+		and start swiping.
 	</p>
 </main>

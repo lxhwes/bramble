@@ -19,6 +19,6 @@ export const actions: Actions = {
 			maxAge: 2592000,
 			sameSite: 'lax',
 		});
-		throw redirect(303, `/s/${id}?p=alex`);
+		throw redirect(303, `/s/${id}`);
 	},
 };
