@@ -431,6 +431,34 @@
 					</span>
 				</article>
 
+				<!-- Action buttons (mirror swipe directions: ← no, ↑ super, → yes) -->
+				<div class="flex items-center gap-6">
+					<button
+						type="button"
+						onclick={() => recordVote('no')}
+						aria-label="No"
+						class="flex h-16 w-16 items-center justify-center rounded-full border-2 border-rose-500 bg-white text-2xl text-rose-500 shadow-md transition-transform hover:bg-rose-50 active:scale-95"
+					>
+						✕
+					</button>
+					<button
+						type="button"
+						onclick={() => recordVote('super')}
+						aria-label="Super like"
+						class="flex h-14 w-14 items-center justify-center rounded-full border-2 border-sky-400 bg-white text-xl text-sky-400 shadow-md transition-transform hover:bg-sky-50 active:scale-95"
+					>
+						★
+					</button>
+					<button
+						type="button"
+						onclick={() => recordVote('yes')}
+						aria-label="Yes"
+						class="flex h-16 w-16 items-center justify-center rounded-full border-2 border-emerald-500 bg-white text-2xl text-emerald-500 shadow-md transition-transform hover:bg-emerald-50 active:scale-95"
+					>
+						♥
+					</button>
+				</div>
+
 				<!-- Hint -->
 				<p class="text-sm text-gray-400">
 					← no &nbsp;|&nbsp; yes → &nbsp;|&nbsp; ↑ super
