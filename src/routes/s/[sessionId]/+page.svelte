@@ -347,6 +347,49 @@
 
 		const intervalId = setInterval(flush, 5000);
 
+		// Live match polling — diff each response against the previous, fire a
+		// toast for newly mutual names. lastSeenMatchKeys is null on first call
+		// so the cold-start response becomes the baseline (no toast for matches
+		// that already existed when the page loaded).
+		let lastSeenMatchKeys: Set<string> | null = null;
+
+		async function pollMatches() {
+			try {
+				const res = await fetch(`/s/${data.sessionId}/matches.json`);
+				if (!res.ok) return;
+				const body = (await res.json()) as {
+					matches: Array<{ name: string; sex: 'M' | 'F' }>;
+				};
+				const currentKeys = new Set(
+					body.matches.map((m) => `${m.name}|${m.sex}`),
+				);
+				if (lastSeenMatchKeys === null) {
+					lastSeenMatchKeys = currentKeys;
+					return;
+				}
+				const fresh = body.matches.filter(
+					(m) => !lastSeenMatchKeys?.has(`${m.name}|${m.sex}`),
+				);
+				if (fresh.length > 0) {
+					newMatchToast =
+						fresh.length === 1
+							? `It's a match: ${fresh[0].name}!`
+							: `${fresh.length} new matches!`;
+					if (newMatchTimeoutId !== null) clearTimeout(newMatchTimeoutId);
+					newMatchTimeoutId = setTimeout(() => {
+						newMatchToast = null;
+						newMatchTimeoutId = null;
+					}, 4000);
+				}
+				lastSeenMatchKeys = currentKeys;
+			} catch {
+				// Silent — retry next interval.
+			}
+		}
+
+		void pollMatches();
+		const matchPollId = setInterval(pollMatches, 30000);
+
 		function onKeyDown(e: KeyboardEvent) {
 			if (e.key === 'ArrowLeft') recordVote('no');
 			else if (e.key === 'ArrowRight') recordVote('yes');
@@ -363,6 +406,11 @@
 
 		return () => {
 			clearInterval(intervalId);
+			clearInterval(matchPollId);
+			if (newMatchTimeoutId !== null) {
+				clearTimeout(newMatchTimeoutId);
+				newMatchTimeoutId = null;
+			}
 			window.removeEventListener('keydown', onKeyDown);
 			window.removeEventListener('beforeunload', onBeforeUnload);
 		};
@@ -414,6 +462,12 @@
 		if (dy < 0) return `rgba(56, 189, 248, ${ay * 0.3})`;
 		return 'transparent';
 	});
+
+	// ---------------------------------------------------------------------------
+	// Live match toast
+	// ---------------------------------------------------------------------------
+	let newMatchToast = $state<string | null>(null);
+	let newMatchTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 	// ---------------------------------------------------------------------------
 	// Share + switch partner
@@ -654,6 +708,17 @@
 			aria-live="polite"
 		>
 			Link copied
+		</div>
+	{/if}
+
+	<!-- Live match toast -->
+	{#if newMatchToast !== null}
+		<div
+			class="fixed bottom-20 left-1/2 -translate-x-1/2 rounded-full bg-sage-700 px-4 py-2 text-sm text-white shadow-lg"
+			role="status"
+			aria-live="polite"
+		>
+			{newMatchToast}
 		</div>
 	{/if}
 
