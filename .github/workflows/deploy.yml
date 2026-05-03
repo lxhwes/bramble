@@ -31,16 +31,16 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@a7487ba4cd5e3c3b2c5b9e67c47b40e2dcd1f5b0 # v4.1.0
+      - uses: pnpm/action-setup@v4
         with:
-          version: "10.18"
+          version: 10.18.3
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@v4
         with:
-          node-version: "22"
-          cache: "pnpm"
+          node-version: 22
+          cache: pnpm
 
       - run: pnpm install --frozen-lockfile
 
@@ -50,7 +50,7 @@ jobs:
 
       - run: pnpm build
 
-      - uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+      - uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
