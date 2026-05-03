@@ -396,10 +396,34 @@
 	// Share + switch partner
 	// ---------------------------------------------------------------------------
 	let toastVisible = $state(false);
+	let qrSvg = $state<string | null>(null);
+	let qrLoading = $state(false);
+
+	function shareUrl(): string {
+		return `${window.location.origin}/s/${data.sessionId}`;
+	}
 
 	async function share() {
-		if (typeof navigator === 'undefined' || !navigator.clipboard) return;
-		const url = `${window.location.origin}/s/${data.sessionId}`;
+		if (typeof navigator === 'undefined') return;
+		const url = shareUrl();
+		const payload = {
+			title: 'Bramble',
+			text: 'Help me pick a baby name 🌱',
+			url,
+		};
+		// Prefer the native share sheet on platforms that support it (iOS/Android,
+		// recent Chrome/Edge). Fall back to clipboard everywhere else.
+		if (typeof navigator.share === 'function') {
+			try {
+				await navigator.share(payload);
+				return;
+			} catch (err) {
+				// User dismissed the sheet — don't fall through to clipboard.
+				if (err instanceof Error && err.name === 'AbortError') return;
+				// Any other failure: fall through to the clipboard path below.
+			}
+		}
+		if (!navigator.clipboard) return;
 		try {
 			await navigator.clipboard.writeText(url);
 			toastVisible = true;
@@ -408,6 +432,27 @@
 			}, 2000);
 		} catch {
 			// Permission denied or unsupported — silent failure is acceptable.
+		}
+	}
+
+	async function toggleQr() {
+		if (qrSvg !== null) {
+			qrSvg = null;
+			return;
+		}
+		qrLoading = true;
+		try {
+			// Lazy import keeps the ~50KB qrcode library out of the initial bundle.
+			const { default: QRCode } = await import('qrcode');
+			qrSvg = await QRCode.toString(shareUrl(), {
+				type: 'svg',
+				margin: 1,
+				width: 200,
+			});
+		} catch {
+			qrSvg = null;
+		} finally {
+			qrLoading = false;
 		}
 	}
 </script>
@@ -465,14 +510,38 @@
 						switch
 					</a>
 				</div>
+				<div class="flex items-center gap-2">
+					<button
+						type="button"
+						onclick={toggleQr}
+						aria-label={qrSvg !== null ? 'Hide QR code' : 'Show QR code'}
+						aria-pressed={qrSvg !== null}
+						class="rounded-full border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-50"
+					>
+						{qrLoading ? '…' : 'QR'}
+					</button>
+					<button
+						type="button"
+						onclick={share}
+						class="rounded-full border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-50"
+					>
+						Share
+					</button>
+				</div>
+			</div>
+
+			{#if qrSvg !== null}
 				<button
 					type="button"
-					onclick={share}
-					class="rounded-full border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-50"
+					onclick={toggleQr}
+					aria-label="Hide QR code"
+					class="rounded-lg border border-gray-200 bg-white p-3 shadow-sm hover:bg-gray-50"
 				>
-					Share
+					<!-- SVG comes from the qrcode library; safe to inline -->
+					<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+					{@html qrSvg}
 				</button>
-			</div>
+			{/if}
 
 			<FilterBar state={filterState} onchange={updateFilters} />
 
