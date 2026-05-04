@@ -16,10 +16,14 @@ SvelteKit on Cloudflare Pages and Workers, with name data preprocessed from SSA 
 
 ```bash
 pnpm install
-pnpm dev
+pnpm dev               # vite dev server (local KV via wrangler)
+pnpm check             # wrangler types + svelte-check (zero warnings)
+pnpm test              # vitest
+pnpm build             # production build via adapter-cloudflare
+pnpm build:names       # regenerate static/names.json from data/ssa + data/btn
 ```
 
-See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [docs/PHASE-1.md](docs/PHASE-1.md) for the project plan and architecture notes.
+See [docs/ROADMAP.md](docs/ROADMAP.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/PHASE-0.md](docs/PHASE-0.md), [docs/PHASE-1.md](docs/PHASE-1.md), and [docs/PHASE-1.5.md](docs/PHASE-1.5.md) for the project plan and architecture notes.
 
 ## License
 
