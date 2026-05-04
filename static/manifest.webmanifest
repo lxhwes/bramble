@@ -1,0 +1,23 @@
+{
+	"name": "Bramble",
+	"short_name": "Bramble",
+	"description": "Swipe on baby names together.",
+	"start_url": "/",
+	"display": "standalone",
+	"background_color": "#fff7f5",
+	"theme_color": "#e8604c",
+	"icons": [
+		{
+			"src": "/icons/icon-192.png",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "any maskable"
+		},
+		{
+			"src": "/icons/icon-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any maskable"
+		}
+	]
+}
