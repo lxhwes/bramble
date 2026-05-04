@@ -46,6 +46,12 @@
 		>
 			Print / Save PDF
 		</a>
+		<a
+			href="/s/{data.sessionId}/shortlist"
+			class="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 active:bg-slate-100"
+		>
+			View shortlist
+		</a>
 	</div>
 
 	{#if data.partnerSlugs.length < 2}
