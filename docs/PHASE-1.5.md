@@ -1,6 +1,6 @@
 # Phase 1.5: Public launch prep
 
-**Status:** planned. See `ROADMAP.md` for the phase goal and DoD; this file is the executable task list.
+**Status:** Wave 1 shipped 2026-05-04 (W1.5 partial — see Outstanding). Wave 2 planned. See `ROADMAP.md` for the phase goal and DoD; this file is the executable task list.
 
 Goal: foundational work that's a precondition for inviting strangers — D1 migration, magic-link auth, PWA, stats, export, shortlist mode, runner deps bump, public repo.
 
@@ -8,7 +8,7 @@ Goal: foundational work that's a precondition for inviting strangers — D1 migr
 
 Six items below touch disjoint files and can land in any order. Plan rationale lives in `~/.claude/plans/review-docs-roadmap-md-and-plan-glittery-perlis.md`.
 
-### W1.1 — GH Actions runner deps bump
+### W1.1 — GH Actions runner deps bump `9789564`
 
 - File: `.github/workflows/deploy.yml`.
 - Bump `actions/checkout@v4` → `v6`, `actions/setup-node@v4` → `v6`, `pnpm/action-setup@v4` → `v6`, `cloudflare/wrangler-action@v3` (already on v3, pin to latest patch).
@@ -16,7 +16,7 @@ Six items below touch disjoint files and can land in any order. Plan rationale l
 - Verify deploy job stays green on a throwaway branch before merging.
 - Commit: `chore(ci): bump GitHub Actions runner deps`.
 
-### W1.2 — PWA scaffold
+### W1.2 — PWA scaffold `5bfe3af`
 
 - New: `static/manifest.webmanifest`, `static/icons/*`, `src/service-worker.ts`, `src/lib/pwa/cache.ts` (+ test), `src/lib/components/InstallBanner.svelte`.
 - Modify: `src/app.html` (manifest link tag).
@@ -24,7 +24,7 @@ Six items below touch disjoint files and can land in any order. Plan rationale l
 - First commit: `test(pwa): cache version helper` + the helper.
 - Subsequent commits: `feat(pwa): manifest and icons`, `feat(pwa): service worker with versioned cache`, `feat(pwa): install banner`, `feat(pwa): /sw-clear kill switch`.
 
-### W1.3 — Export shortlist (JSON + printable HTML)
+### W1.3 — Export shortlist (JSON + printable HTML) `309db1d`
 
 - New: `src/routes/s/[sessionId]/matches/export.json/+server.ts`, `src/routes/s/[sessionId]/matches/export.html/+server.ts`, `src/lib/export/shortlist.ts` (+ test).
 - Modify: `src/routes/s/[sessionId]/matches/+page.svelte` — add export button.
@@ -32,7 +32,7 @@ Six items below touch disjoint files and can land in any order. Plan rationale l
 - First commit: `test(export): buildShortlistJson` + helper.
 - Then: `feat(export): JSON shortlist endpoint`, `feat(export): printable HTML shortlist`, `feat(matches): export button`.
 
-### W1.4 — Stats page
+### W1.4 — Stats page `2023182`
 
 - New: `src/routes/s/[sessionId]/stats/+page.server.ts`, `+page.svelte`, `src/lib/stats/aggregate.ts` (+ test).
 - Read-only against existing `getVotes` / `getMatches`. Computes:
@@ -42,7 +42,7 @@ Six items below touch disjoint files and can land in any order. Plan rationale l
 - First commit: `test(stats): computeStats` returning `{ likeRate, mutualLikes, disagreements }`.
 - Then: `feat(stats): stats route + aggregations`.
 
-### W1.5 — README polish + flip repo public
+### W1.5 — README polish + flip repo public `0880100` (partial)
 
 - File: `README.md`.
 - Add: live demo link, screenshot, license blurb (MIT app code, CC BY-SA dataset), attribution to SSA + Behind the Name, `pnpm dev` quick start, link to `docs/ROADMAP.md`.
@@ -51,7 +51,7 @@ Six items below touch disjoint files and can land in any order. Plan rationale l
 - Commit: `docs(readme): polish for public launch`.
 - Repo-visibility flip is a manual GitHub setting, not a commit.
 
-### W1.6 — D1 scaffolding (PR-1 of 3)
+### W1.6 — D1 scaffolding (PR-1 of 3) `988f5b7`
 
 - New: `migrations/0001_init.sql`, `src/lib/server/db.ts`.
 - Modify: `wrangler.toml` (add `[[d1_databases]]` binding for `DB`).
@@ -59,6 +59,13 @@ Six items below touch disjoint files and can land in any order. Plan rationale l
 - No callers yet. Does **not** modify `src/lib/server/sessions.ts`. Unblocks Wave 2 without coordinating a cutover.
 - First commit: `test(db): schema applies cleanly` against an in-memory better-sqlite3 fixture.
 - Then: `feat(db): D1 binding + initial migration`.
+
+## Outstanding (Wave 1)
+
+- **W1.5 README polish — public-launch copy.** The "Status: early development — Phase 0" line is intentionally untouched per maintainer instruction; live demo link and screenshot are likewise deferred. These flip together with the repo's GitHub visibility setting in a follow-up commit when the maintainer is ready.
+- **W1.2 PWA icons.** `static/icons/icon-192.png` and `icon-512.png` are solid-coral placeholders. Replace with real branded artwork before public launch.
+- **W1.6 D1 database_id.** `wrangler.toml` has a placeholder `database_id`; maintainer must `wrangler d1 create bramble` and substitute the real ID before the first deploy that exercises Wave 2.
+- **W1.1 CI verification.** The actions bump landed on `main`; first push validates the bumped runners on a real deploy.
 
 ## Wave 2 (sequenced after W1.6 lands)
 
