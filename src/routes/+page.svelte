@@ -5,8 +5,9 @@
 </script>
 
 <main class="flex min-h-screen flex-col items-center justify-center gap-8 px-4">
-	<div class="text-center">
-		<h1 class="text-5xl font-bold tracking-tight text-gray-900">Bramble</h1>
+	<div class="flex flex-col items-center text-center">
+		<img src="/logo.png" alt="Bramble" class="h-40 w-40" />
+		<h1 class="mt-4 text-5xl font-bold tracking-tight text-gray-900">Bramble</h1>
 		<p class="mt-3 text-lg text-gray-500">Swipe baby names. Find mutual matches.</p>
 	</div>
 
