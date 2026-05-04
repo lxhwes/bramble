@@ -24,3 +24,6 @@ vite.config.ts.timestamp-*
 
 # Local name dataset cache (generated; never commit)
 data/
+
+# Local Claude Code config (per-developer)
+.claude/
