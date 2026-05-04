@@ -9,3 +9,18 @@ pages_build_output_dir = ".svelte-kit/cloudflare"
 binding = "VOTES"
 id = "bfb9d2ff18b14322b8a4e8cc4929c389"
 preview_id = "ccd8f64b574a4a61b3d4bead2e47af67"
+
+# D1 database for structured vote storage (Phase 1.5 migration).
+#
+# Setup (one-time, per environment):
+#   1. Create the database:
+#        wrangler d1 create bramble
+#      Copy the `database_id` from the output and replace the placeholder below.
+#   2. Apply the initial migration:
+#        wrangler d1 execute bramble --file=migrations/0001_init.sql
+#   3. For local dev (`wrangler pages dev`), wrangler creates a local SQLite
+#      file automatically — no extra steps needed.
+[[d1_databases]]
+binding = "DB"
+database_name = "bramble"
+database_id = "<replace-with-real-id>"
