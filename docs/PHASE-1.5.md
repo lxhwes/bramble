@@ -1,6 +1,6 @@
 # Phase 1.5: Public launch prep
 
-**Status:** Wave 1 shipped 2026-05-04 (W1.5 partial — see Outstanding). Wave 2 planned. See `ROADMAP.md` for the phase goal and DoD; this file is the executable task list.
+**Status:** Wave 1 shipped 2026-05-04 (W1.5 partial — see Outstanding). Wave 2 partial — W2.1 and W2.4 shipped 2026-05-04; W2.2 and W2.3 deferred. See `ROADMAP.md` for the phase goal and DoD; this file is the executable task list.
 
 Goal: foundational work that's a precondition for inviting strangers — D1 migration, magic-link auth, PWA, stats, export, shortlist mode, runner deps bump, public repo.
 
@@ -71,31 +71,33 @@ Six items below touch disjoint files and can land in any order. Plan rationale l
 
 Hold all of these until W1.6 has merged so `sessions.ts` stays clear of merge conflicts during the parallel wave.
 
-### W2.1 — D1 dual-write (PR-2 of 3)
+### W2.1 — D1 dual-write (PR-2 of 3) `99e73a6`
 
 - Modify: `src/lib/server/sessions.ts:appendVotes` — write to both KV and D1. Reads still hit KV.
 - Vitest fixture compares both stores for parity.
 - Commit: `feat(db): dual-write votes to KV and D1`.
 
-### W2.2 — D1 read cutover (PR-3 of 3)
+### W2.2 — D1 read cutover (PR-3 of 3) — deferred
 
 - Flip reads to D1. KV becomes hot-state-only (cursor, recent-votes ring buffer).
 - Remove the dual-write fallback once parity holds in production for a week.
 - Commit: `feat(db): read votes from D1; KV demoted to hot state`.
+- **Held:** wants production-soak validation of W2.1's parity before flipping. Re-evaluate after Wave 2 has been live one week.
 
-### W2.3 — Magic-link auth via Resend
+### W2.3 — Magic-link auth via Resend — deferred
 
 - Depends on `users` and `sessions` tables existing in D1.
 - New: `src/routes/auth/login/+page.svelte`, `src/routes/auth/callback/+server.ts`, `src/lib/server/auth.ts`.
 - Modify: `src/hooks.server.ts` to read auth cookie and populate `event.locals.user`.
 - Anonymous sessions still work without auth; first sign-in merges the anonymous session into the user account.
 - Commit chain: `feat(auth): magic-link infrastructure`, `feat(auth): /auth/login + Resend send`, `feat(auth): /auth/callback + session merge`.
+- **Held:** needs maintainer input on Resend API key, sender domain, and email template before scaffolding can begin.
 
-### W2.4 — Post-deck shortlist mode
+### W2.4 — Post-deck shortlist mode `b1ff684`
 
-- Depends on D1 (`shortlists` table).
-- New: `/s/[id]/shortlist` route — narrows matches to a top 5 via head-to-head comparisons.
-- Commit: `feat(shortlist): top-5 narrowing pass over matches`.
+- Adds `shortlists` table via migration 0002.
+- New: `/s/[id]/shortlist` route. UX is tap-to-add/remove — server-authoritative via SvelteKit form actions with `use:enhance`.
+- Head-to-head tournament narrowing was descoped to Phase 3+; v1 ships the simpler tap-toggle.
 
 ## Anti-tasks (NOT in Phase 1.5)
 
