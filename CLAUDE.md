@@ -57,10 +57,26 @@ Full routing table: `@memory/cloudflare-platform.md`. For local dev (`pnpm dev`,
 - No new runtime dependencies without flagging in your plan first. Build-time deps are fine.
 - Vitest is wired (node env). New non-trivial logic ships with tests; trivial UI tweaks don't need them.
 
+## Work tracking
+
+Three tiers, each with one job. Don't cross them.
+
+- **`docs/ROADMAP.md`** — phase-level scope. Per phase: goal, scope, DoD (concrete bullets, restated even after shipping), status (`planned` / `in progress since YYYY-MM-DD` / `shipped YYYY-MM-DD`). Authoritative for what's in/out.
+- **`docs/PHASE-N.md`** — executable task list for the current phase. Tasks get commit hashes as they ship. Scope-locked: nothing added mid-phase; deferrals move to the next phase's ROADMAP entry. Keep an "Outstanding" subsection for items the phase shipped without.
+- **Project memory** (`~/.claude/projects/-Users-ahowes-code-bramble/memory/`) — cross-session knowledge only: feedback rules, design-intent flags ("looks like a bug, isn't"), external references. Not a backlog.
+
+Movement rules:
+
+- Backlog discovered mid-phase → next-phase entry in ROADMAP, not memory.
+- Hard deadlines (e.g. action-runner EOL) → ROADMAP, not memory.
+- A "still pending" memory entry is a smell — convert it to a ROADMAP item. Keep the memory only if the *reason* it's deferred is non-obvious cross-session knowledge.
+- Behavior intentionally NOT a bug → memory, design-intent type.
+- Phase ships → restate DoD as concrete bullets in ROADMAP. Never just "DoD met."
+
 ## Working style
 
 - Always produce a brief plan before writing code for any non-trivial task. Stop and wait for approval.
-- When in doubt, do less. Resist sneaking in features beyond the current phase scope (see `PHASE-N.md`).
+- When in doubt, do less. Resist sneaking in features beyond the current phase scope (see `docs/PHASE-N.md`).
 - Don't write README features that don't exist yet.
 - Terse output. Skip the recap of what you just did unless asked.
 - If you hit a decision point not covered in the docs, ask rather than guess.
