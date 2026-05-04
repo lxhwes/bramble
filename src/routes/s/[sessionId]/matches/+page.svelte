@@ -30,6 +30,24 @@
 		{data.partnerSlugs.length} partners · {data.matches.length} mutual yeses
 	</p>
 
+	<div class="mt-3 flex gap-2">
+		<a
+			href="/s/{data.sessionId}/matches/export.json"
+			download="bramble-shortlist.json"
+			class="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 active:bg-slate-100"
+		>
+			Export JSON
+		</a>
+		<a
+			href="/s/{data.sessionId}/matches/export.html"
+			target="_blank"
+			rel="noopener"
+			class="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 active:bg-slate-100"
+		>
+			Print / Save PDF
+		</a>
+	</div>
+
 	{#if data.partnerSlugs.length < 2}
 		<p class="mt-6 text-slate-600">Waiting for at least two partners to vote.</p>
 	{:else if visible.length === 0}
