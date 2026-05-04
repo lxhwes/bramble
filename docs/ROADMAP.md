@@ -18,7 +18,19 @@ Shipped under `PHASE-1.md` (filters, resume, undo, name detail bottom-sheet, sha
 
 Outstanding under this phase: BTN dataset still needs a manual export drop into `data/btn/` to populate origin/meaning. Bottom-sheet shows `—` for those fields until then.
 
-DoD met.
+DoD met:
+- Two phones, same session: resume mid-deck across reloads without losing position.
+- Filter bar (gender, era, popularity, starts-with) survives reload via URL params.
+- Undo button + `Z` key reverse the last 5 votes before they flush to the server.
+- Tap a card to open a bottom-sheet with origin, meaning, peak year, total count.
+- Share button copies the bare `/s/{id}` URL; switch-partner returns to the join form.
+- Landing page surfaces a resume link when the `bramble_last_session` cookie is set.
+- Coral/sage brand palette + DM Sans, polished swipe animations, larger cards.
+- Live "It's a match!" toast on the swipe page when a new mutual lands; partner-progress badge in the toolbar.
+- Web share API on supported devices with QR fallback for in-person handoff.
+- Super-like attribution rendered on the matches view.
+- Tap buttons for yes/no/super alongside swipe + keyboard.
+- Slug persistence + collision detection on the join form.
 
 ## Phase 1.5 — Public launch prep
 
@@ -30,6 +42,8 @@ Foundational work that's a precondition for inviting strangers. Originally bundl
 - Stats page: like rate, mutual likes, disagreement list.
 - PWA: manifest, service worker caches bundle and dataset, install banner.
 - Export shortlist (JSON + printable HTML).
+- Post-deck shortlist pass: once partners have a matches set, give them a "narrow this to a top 5" mode. Different intent (decision) than the main deck (discovery). Storage probably a new KV key per session, or localStorage if it stays personal.
+- Bump GitHub Actions runner deps before Node 20 EOL (hard deadline 2026-09-16): `actions/checkout`, `actions/setup-node`, `cloudflare/wrangler-action`, `pnpm/action-setup`.
 - Open the GitHub repo. README links to live demo.
 
 DoD: post link in name-nerd subreddits; get unprompted "I used this with my partner" replies; nothing breaks under that load.
@@ -43,8 +57,9 @@ Goal: a stranger arrives via Google for "Norse boy names," lands on a name detai
 - Search by meaning (full-text on the meaning field), by origin, by sound (metaphone or double-metaphone).
 - Recommendation algorithm: collaborative filter on swipe history. After ~50 swipes per partner, deck reweights toward names liked by similar users.
 - Couple style analysis: cluster joint likes by latent features (era, origin, sound, popularity); produce a 2–3 sentence summary via an LLM call. Equivalent to Nameberry's "Baby Name DNA."
-- Multi-partner sessions (more than 2 swipers per session).
 - Trending data surfaced from internal vote stream.
+
+(Multi-partner sessions already work at the URL level — `partnerSlugs: string[]` in KV meta and `getMatches` intersects across all partners. Not a Phase 2 deliverable; surface as a UX affordance only if a planned 3+ swiper experience justifies it.)
 
 ## Phase 3 — Differentiation
 
