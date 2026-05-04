@@ -1,5 +1,7 @@
 # Phase 1: Personal Experience Slice
 
+**Status:** shipped 2026-05-03. All 7 tasks below landed; pre-Phase-1 housekeeping (Vitest scaffold, doc cross-references) shipped earlier the same day. A follow-up wave landed the same day with pairing UX polish, web share + QR fallback, coral/sage brand palette, super-like attribution on matches, tap-button vote input, partner-progress badge, and live match toast — see `ROADMAP.md` Phase 1 entry for the full follow-up list.
+
 Goal: maintainer + spouse use Bramble daily without papercuts. Resume across reloads, undo, filters, name detail, share, smoother UX. Still personal-tool-grade — no auth, no D1, no public launch.
 
 ## Done when
@@ -15,7 +17,7 @@ Goal: maintainer + spouse use Bramble daily without papercuts. Resume across rel
 
 ## Tasks
 
-### 1. BTN data integration
+### 1. BTN data integration `acd1cf1`
 
 - Update `scripts/build-names.ts` to merge a BTN export (CSV or JSON, whichever the maintainer drops into `data/btn/`) by name, attaching `origin` (string) and `meaning` (string) when matched.
 - Document the manual fetch URL + expected file shape in a top-of-script comment.
@@ -23,14 +25,14 @@ Goal: maintainer + spouse use Bramble daily without papercuts. Resume across rel
 - Re-run the script if BTN data is present locally; commit the updated `static/names.json` and the script changes. If no BTN data is available yet, ship the script changes only — names.json regenerates later.
 - Commit: `feat(data): merge Behind the Name origin and meaning`.
 
-### 2. Deck cursor / resume
+### 2. Deck cursor / resume `151c253`
 
 - Cursor is implicit: skip names whose `(name, sex)` already appears in the partner's `votes` array.
 - The server `+page.server.ts` for `/s/[sessionId]/` already loads partner votes via `getVotes`; pass them to the page component, build a `Set<"name|sex">` of voted keys, filter the shuffled deck through it.
 - No new KV keys, no new server functions. Pure client-side derivation.
 - Commit: `feat(swipe): resume from last unvoted name on reload`.
 
-### 3. Undo (last 5)
+### 3. Undo (last 5) `d5445f8`
 
 - Hold the most recent 5 votes in a local `undoStack` BEFORE they enter the flush queue. Older votes graduate from the stack to the queue and flush as today.
 - "Undo" pops the last vote off the stack, restores the card to the deck head, and rewinds the deck index by one. Disabled when the stack is empty.
@@ -38,7 +40,7 @@ Goal: maintainer + spouse use Bramble daily without papercuts. Resume across rel
 - Server contract unchanged — no delete endpoint needed because un-undone votes never get sent.
 - Commit: `feat(swipe): undo last five swipes`.
 
-### 4. Filters
+### 4. Filters `eb519cc` (+ fix `f14cc3f`)
 
 - Filter dimensions:
   - Gender: `m` / `f` / `both` (default both).
@@ -50,13 +52,13 @@ Goal: maintainer + spouse use Bramble daily without papercuts. Resume across rel
 - When the filtered set changes, re-derive the deck (deterministic shuffle of the filtered subset, then skip-voted as in task 2). Active card resets to the new index 0.
 - Commit: `feat(swipe): filter deck by gender, era, popularity, starts-with`.
 
-### 5. Share + switch partner
+### 5. Share + switch partner `02946bc`
 
 - "Share" button on the swipe page (top-right): copies `${origin}/s/${sessionId}` (no `?p=`, no filters) to clipboard via `navigator.clipboard.writeText`. Shows a 2-second toast confirming.
 - "Switch partner" link: navigates to `/s/{id}` (no `?p=`), which already triggers the join form per Task 4 of Phase 0.
 - Commit: `feat(swipe): share session URL and switch partner`.
 
-### 6. Name detail bottom-sheet
+### 6. Name detail bottom-sheet `838cce5`
 
 - Tap on the active card (distinct from drag: `pointerup` with abs(dx) < 5 AND abs(dy) < 5 AND dt < 250ms) opens the sheet.
 - Sheet content: name, gender, peak year, total count, origin (or `—`), meaning (or `—`).
@@ -64,7 +66,7 @@ Goal: maintainer + spouse use Bramble daily without papercuts. Resume across rel
 - Use the native `<dialog>` element with `showModal()`. No new dependencies.
 - Commit: `feat(swipe): name detail bottom-sheet`.
 
-### 7. UX polish
+### 7. UX polish `54dfe19`
 
 - Card: max 80vw × 60vh, larger type, heavier shadow, colored tint that ramps with swipe distance (red ≤−80, green ≥80, blue when dy ≤ −80).
 - Snap-back uses a spring transition (`transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1)`).

@@ -28,6 +28,17 @@ pnpm build:names  # regenerate static/names.json from data/ssa + data/btn
 - **Lint/format**: Biome
 - **Data**: SSA national + Behind the Name (CC BY-SA), preprocessed at build time into `static/names.json`
 
+## Cloudflare tooling
+
+This project deploys to Cloudflare. Prefer the installed Cloudflare MCP/skills over shell calls or pre-trained knowledge:
+- KV reads/writes against deployed env → `mcp__plugin_cloudflare_cloudflare-bindings__kv_*`
+- Production log inspection → `mcp__plugin_cloudflare_cloudflare-observability__query_worker_observability`
+- Wrangler config/CLI changes → load `cloudflare:wrangler` skill
+- Server route / adapter-cloudflare review → load `cloudflare:workers-best-practices` skill
+- Phase 1 polish perf passes → load `cloudflare:web-perf` skill
+
+Full routing table: `@memory/cloudflare-platform.md`. For local dev (`pnpm dev`, `wrangler dev`), shell `wrangler` is still correct — these MCP tools target deployed accounts.
+
 ## Layout
 
 - `src/routes/` — SvelteKit pages and form actions

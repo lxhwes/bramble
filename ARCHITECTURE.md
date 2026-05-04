@@ -8,11 +8,11 @@ SvelteKit gives us SSR, routing, and a single-language mental model. The Cloudfl
 
 We may migrate to Astro at Phase 2 when per-name SEO pages become the dominant route count. Until then, SvelteKit's DX is the right tradeoff.
 
-### Cloudflare KV (Phase 0) → D1 (Phase 1)
+### Cloudflare KV
 
-KV is dead simple: one key, one value, eventually consistent. Phase 0 has no relational data, no need for queries, just per-session blobs. Storing votes as `session:{id}:partner:{slug}` → JSON array fits KV perfectly.
+KV is dead simple: one key, one value, eventually consistent. Phases 0 and 1 have no relational data and no query needs beyond "fetch this session's blobs," just per-session arrays. Storing votes as `session:{id}:partner:{slug}` → JSON array fits KV perfectly.
 
-Phase 1 introduces real users, multi-session history, and queries like "all sessions for this user." That's D1. KV stays for hot session state where eventual consistency is fine and key-shape is predictable.
+D1 is deferred to the public-launch prep phase — see `ROADMAP.md` Phase 1.5. When real users, multi-session history, and queries like "all sessions for this user" arrive, those tables move to D1. KV will continue to hold hot session state where eventual consistency is fine and key-shape is predictable.
 
 ### No auth in Phase 0
 
@@ -42,7 +42,7 @@ session:{sessionId}:meta
 
 That's it. Match view loads all partner keys for a session, intersects the `yes` votes by name, returns the list.
 
-### Phase 1 (D1, sketch only)
+### Phase 1.5 (D1, sketch only — deferred)
 
 ```sql
 users (id, email, created_at)

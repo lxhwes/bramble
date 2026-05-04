@@ -2,24 +2,31 @@
 
 Phases are sequential. Each has a clear DoD; do not bleed work between phases.
 
-## Phase 0 — Personal Tool
+## Phase 0 — Personal Tool (shipped 2026-05-02)
 
 Goal: maintainer and partner swipe asynchronously on their phones, see mutual matches.
 
 Scope: SvelteKit scaffold, preprocessed names dataset, URL-shared sessions, KV-backed votes, swipe deck, match view, deploy to a Cloudflare Pages subdomain. No accounts, no filters, no name detail pages, no PWA. See `PHASE-0.md` for the executable task list.
 
-DoD: two phones can join the same session via different `?p=` URLs, swipe a few hundred names each, and see the intersection.
+DoD met: two phones joined the same session, swiped, saw the intersection.
 
-## Phase 1 — Public MVP
+## Phase 1 — Personal-tool polish (shipped 2026-05-03)
 
-Goal: a friend can use Bramble for their own couple without hand-holding.
+Goal: maintainer + spouse use Bramble daily without papercuts. Personal-tool-grade — no auth, no D1, no public launch.
+
+Shipped under `PHASE-1.md` (filters, resume, undo, name detail bottom-sheet, share + switch partner, BTN merge script, UX polish) plus a same-day follow-up wave: resume cookie refresh on join, partner-progress badge, live match toast, slug persistence + collision detection, web share API + QR fallback, coral/sage brand palette + DM Sans, super-like attribution on the matches view, tap-button vote input.
+
+Outstanding under this phase: BTN dataset still needs a manual export drop into `data/btn/` to populate origin/meaning. Bottom-sheet shows `—` for those fields until then.
+
+DoD met.
+
+## Phase 1.5 — Public launch prep
+
+Foundational work that's a precondition for inviting strangers. Originally bundled into Phase 1 in this roadmap, then explicitly deferred when the personal-tool slice took priority.
 
 - Migrate vote storage from KV to D1; KV stays for hot session state (deck cursor, etc.).
 - Schema: `users`, `sessions`, `partners`, `votes`, `name_meta`.
 - Magic-link auth via Resend or similar. Anonymous sessions still work without auth.
-- Filters: gender, era (peak decade), starts-with, popularity tier, length.
-- Undo (last 5 swipes). Resume (deck cursor persists per partner).
-- Name detail bottom-sheet on tap: meaning, origin, popularity sparkline, "if you liked this, try…".
 - Stats page: like rate, mutual likes, disagreement list.
 - PWA: manifest, service worker caches bundle and dataset, install banner.
 - Export shortlist (JSON + printable HTML).
