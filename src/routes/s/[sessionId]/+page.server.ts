@@ -18,7 +18,8 @@ export const load: PageServerLoad = async ({
 		throw error(500, 'Platform not available');
 	}
 
-	const meta = await getSessionMeta(platform.env.VOTES, params.sessionId);
+	const env = { kv: platform.env.VOTES, db: platform.env.DB };
+	const meta = await getSessionMeta(env, params.sessionId);
 
 	if (meta === null) {
 		throw error(404, 'Session not found');
@@ -32,7 +33,7 @@ export const load: PageServerLoad = async ({
 		};
 	}
 
-	await addPartner(platform.env.VOTES, params.sessionId, slug);
+	await addPartner(env, params.sessionId, slug);
 
 	cookies.set('bramble_last_session', params.sessionId, {
 		path: '/',
@@ -48,7 +49,7 @@ export const load: PageServerLoad = async ({
 		: [...meta.partnerSlugs, slug];
 
 	const allPartnerVotes = await Promise.all(
-		partnerSlugs.map((s) => getVotes(platform.env.VOTES, params.sessionId, s)),
+		partnerSlugs.map((s) => getVotes(env, params.sessionId, s)),
 	);
 
 	const partnerVoteCounts: Record<string, number> = {};

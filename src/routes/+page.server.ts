@@ -12,7 +12,10 @@ export const actions: Actions = {
 		if (!platform) {
 			throw new Error('platform is not available');
 		}
-		const id = await createSession(platform.env.VOTES);
+		const id = await createSession({
+			kv: platform.env.VOTES,
+			db: platform.env.DB,
+		});
 		// Write cookie before redirect so the browser picks it up immediately.
 		cookies.set('bramble_last_session', id, {
 			path: '/',

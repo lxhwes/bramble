@@ -4,7 +4,10 @@ import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, platform }) => {
 	if (!platform) throw error(500, 'Platform not available');
-	const result = await getMatches(platform.env.VOTES, params.sessionId);
+	const result = await getMatches(
+		{ kv: platform.env.VOTES, db: platform.env.DB },
+		params.sessionId,
+	);
 
 	// getMatches returns partnerSlugs: [] when the session does not exist in KV
 	// (getSessionMeta returns null inside getMatches → meta?.partnerSlugs ?? []).

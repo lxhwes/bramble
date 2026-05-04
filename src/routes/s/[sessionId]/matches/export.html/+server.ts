@@ -7,7 +7,10 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 	if (!platform) {
 		throw error(500, 'Platform not available');
 	}
-	const result = await getMatches(platform.env.VOTES, params.sessionId);
+	const result = await getMatches(
+		{ kv: platform.env.VOTES, db: platform.env.DB },
+		params.sessionId,
+	);
 
 	if (result.partnerSlugs.length === 0) {
 		throw error(404, 'Session not found');

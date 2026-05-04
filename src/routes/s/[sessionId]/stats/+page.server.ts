@@ -6,10 +6,10 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ params, platform }) => {
 	if (!platform) throw error(500, 'Platform not available');
 
-	const kv = platform.env.VOTES;
+	const env = { kv: platform.env.VOTES, db: platform.env.DB };
 	const { sessionId } = params;
 
-	const meta = await getSessionMeta(kv, sessionId);
+	const meta = await getSessionMeta(env, sessionId);
 	if (meta === null || meta.partnerSlugs.length === 0) {
 		throw error(404, 'Session not found');
 	}
@@ -17,7 +17,7 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 	// Load each partner's votes in parallel.
 	const partnerDataList = await Promise.all(
 		meta.partnerSlugs.map(async (slug) => {
-			const pv = await getVotes(kv, sessionId, slug);
+			const pv = await getVotes(env, sessionId, slug);
 			return { slug, votes: pv?.votes ?? [] };
 		}),
 	);

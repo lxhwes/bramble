@@ -42,7 +42,12 @@ export const POST: RequestHandler = async ({ request, params, platform }) => {
 		throw error(500, 'Platform not available');
 	}
 
-	await appendVotes(platform.env.VOTES, params.sessionId, slug, votes);
+	await appendVotes(
+		{ kv: platform.env.VOTES, db: platform.env.DB },
+		params.sessionId,
+		slug,
+		votes,
+	);
 
 	return new Response(null, { status: 204 });
 };
