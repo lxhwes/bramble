@@ -3,10 +3,10 @@
 Open-source baby name swipe app. Couples (or groups) swipe through names independently and find mutual likes. Started as a free Nameberry alternative; intended for public release once Phase 1 lands.
 
 See:
-- `ROADMAP.md` — phased plan, all phases
-- `ARCHITECTURE.md` — stack decisions and rationale
-- `PHASE-0.md` — Phase 0 scope (shipped)
-- `PHASE-1.md` — current scope of work
+- `docs/ROADMAP.md` — phased plan, all phases
+- `docs/ARCHITECTURE.md` — stack decisions and rationale
+- `docs/PHASE-0.md` — Phase 0 scope (shipped)
+- `docs/PHASE-1.md` — Phase 1 scope (shipped)
 
 ## Quick start
 
