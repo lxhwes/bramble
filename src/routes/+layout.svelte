@@ -1,6 +1,7 @@
 <script lang="ts">
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
+	import Footer from '$lib/components/Footer.svelte';
 	import InstallBanner from '$lib/components/InstallBanner.svelte';
 
 	let { children } = $props();
@@ -8,4 +9,5 @@
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
 {@render children()}
+<Footer />
 <InstallBanner />
