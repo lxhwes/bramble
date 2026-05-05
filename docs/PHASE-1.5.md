@@ -132,9 +132,9 @@ Launch-readiness items. Disjoint files; can land in any order. All must merge be
 
 ### W3.3 — Session TTL / data retention
 
-- Decide retention window (default suggestion: 90 days since last vote).
+- Retention window: **90 days since last vote** (decided 2026-05-05).
 - Implement as a Cloudflare Cron Trigger hitting a scheduled handler that deletes inactive sessions, partners, votes, and shortlist rows in one D1 transaction.
-- Update About page copy to state the actual retention window once decided.
+- Update About page copy to state the 90-day retention window.
 - First commit: `test(sessions): pruneInactiveSessions` + helper.
 - Then: `feat(sessions): scheduled session pruning`.
 
@@ -156,13 +156,13 @@ Launch-readiness items. Disjoint files; can land in any order. All must merge be
 - New: `src/routes/sitemap.xml/+server.ts` — initial sitemap with `/` and `/about`. Phase 2 extends with per-name URLs.
 - Commit: `feat(seo): robots.txt and initial sitemap`.
 
-### W3.7 — D1 backup posture (decision)
+### W3.7 — D1 backup posture (decided 2026-05-05)
 
-- **TBD.** Three viable options:
-  1. Accepted loss — document the policy in `ARCHITECTURE.md`. Personal-tool grade. Zero infra.
-  2. Scheduled R2 export — Cron Trigger runs `wrangler d1 export` and writes to an R2 bucket weekly. Cheap; survives D1 corruption.
-  3. On-demand maintainer backup — manual command, no automation. Lowest cost; relies on discipline.
-- Hold implementation until decision is made; do not pick speculatively.
+- Cloudflare D1 Time Travel provides automatic point-in-time recovery for the last 7 days; that's the canonical backup. Restore via `wrangler d1 time-travel restore`.
+- Pre-migration discipline: maintainer runs `wrangler d1 export bramble --output=...` before any risky migration as a belt-and-suspenders snapshot.
+- Older-than-7-day data loss is accepted (personal-tool grade; swipe votes lose meaning after a name decision).
+- Implementation: add a short paragraph in `ARCHITECTURE.md` capturing this policy. No automation to build.
+- Commit: `docs(architecture): record d1 backup posture`.
 
 ## Anti-tasks (NOT in Phase 1.5)
 
@@ -181,5 +181,3 @@ If a task seems implied but isn't here, stop and ask.
 - Resend vs. another magic-link provider for W2.3.
 - Whether to ship `name_meta` rows into D1 (30k+ rows) or keep them in `static/names.json` and only put per-session vote/match data in D1.
 - Final repo-public flip date — gated on W1.2 + W1.5 landing.
-- W3.3 retention window (default proposal: 90 days since last vote).
-- W3.7 D1 backup posture — pick one of the three options listed under W3.7.

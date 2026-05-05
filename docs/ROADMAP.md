@@ -47,11 +47,11 @@ Foundational work that's a precondition for inviting strangers. Originally bundl
 - About page + shared footer rendering SSA / Behind the Name attribution in-app (not just README). Closes the CLAUDE.md attribution gap.
 - OpenGraph + Twitter card meta tags so shared session URLs unfurl with brand artwork.
 - Cloudflare Web Analytics — first-party, cookie-less; consistent with the About page's "no third-party analytics" promise.
-- Session TTL / data retention: prune inactive sessions on a schedule; About page copy stays honest about the actual retention window.
+- Session TTL / data retention: prune sessions inactive for 90 days on a schedule; About page copy stays honest about the actual retention window.
 - Rate limiting on session create and vote append (Cloudflare rules) so the public flip can't be cheaply abused.
 - Custom 404 / error page on-brand (coral/sage, DM Sans).
 - Robots.txt + initial sitemap.xml (`/`, `/about`); per-name URLs come in Phase 2.
-- D1 backup posture: decide between accepted-loss-and-document, scheduled R2 export, or on-demand backup. **TBD.**
+- D1 backup posture: rely on Cloudflare Time Travel (7-day automatic PITR) plus pre-migration manual `wrangler d1 export`. Documented in `ARCHITECTURE.md`; no automation to build.
 - Open the GitHub repo. README links to live demo.
 
 DoD: post link in name-nerd subreddits; get unprompted "I used this with my partner" replies; nothing breaks under that load.
