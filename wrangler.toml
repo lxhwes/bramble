@@ -11,16 +11,11 @@ id = "bfb9d2ff18b14322b8a4e8cc4929c389"
 preview_id = "ccd8f64b574a4a61b3d4bead2e47af67"
 
 # D1 database for structured vote storage (Phase 1.5 migration).
-#
-# Setup (one-time, per environment):
-#   1. Create the database:
-#        wrangler d1 create bramble
-#      Copy the `database_id` from the output and replace the placeholder below.
-#   2. Apply the initial migration:
-#        wrangler d1 execute bramble --file=migrations/0001_init.sql
-#   3. For local dev (`wrangler pages dev`), wrangler creates a local SQLite
-#      file automatically — no extra steps needed.
+# `preview_database_id` is used by `wrangler pages dev` for local development.
+# Future migrations land in migrations/ and apply via `wrangler d1 migrations apply`.
 [[d1_databases]]
 binding = "DB"
 database_name = "bramble"
-database_id = "<replace-with-real-id>"
+database_id = "d041224d-dee8-4bdc-b33d-b813d18c52cf"
+preview_database_id = "216a9690-9765-4596-a314-120d7e933da8"
+migrations_dir = "migrations"
