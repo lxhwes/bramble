@@ -8,6 +8,7 @@ import {
 	appendVotes,
 	createSession,
 	getMatches,
+	getVotes,
 } from './sessions.js';
 
 // ---------------------------------------------------------------------------
@@ -75,6 +76,10 @@ function openMockDb(): { db: D1Database; raw: Database.Database } {
 						first<T = unknown>(): Promise<T | null> {
 							const row = raw.prepare(query).get(...values) as T | undefined;
 							return Promise.resolve(row ?? null);
+						},
+						all<T = unknown>(): Promise<{ results: T[] }> {
+							const rows = raw.prepare(query).all(...values) as T[];
+							return Promise.resolve({ results: rows });
 						},
 					};
 				},
@@ -487,5 +492,74 @@ describe('sessions.ts — D1 dual-write parity', () => {
 		await appendVotes(env, id, 'alex', [makeVote('Aaden', 'M', 'yes')]);
 		const result = await getMatches(env, id);
 		expect(result.matches).toHaveLength(0); // only one partner
+	});
+});
+
+// ---------------------------------------------------------------------------
+// D1 read cutover (W2.2a)
+// ---------------------------------------------------------------------------
+
+describe('sessions.ts — D1 read cutover (W2.2a)', () => {
+	it('getVotes reads from D1 when db is present', async () => {
+		const { env } = kvAndDb();
+		const id = await createSession(env);
+		await addPartner(env, id, 'alex');
+
+		const ts1 = Date.now();
+		const ts2 = ts1 + 1000;
+		await appendVotes(env, id, 'alex', [
+			{ name: 'Aaden', sex: 'M', vote: 'yes', ts: ts1 },
+			{ name: 'Aaliyah', sex: 'F', vote: 'super', ts: ts2 },
+		]);
+
+		const result = await getVotes(env, id, 'alex');
+
+		expect(result).not.toBeNull();
+		expect(result?.votes).toHaveLength(2);
+		expect(result?.votes[0]).toMatchObject({
+			name: 'Aaden',
+			sex: 'M',
+			vote: 'yes',
+			ts: ts1,
+		});
+		expect(result?.votes[1]).toMatchObject({
+			name: 'Aaliyah',
+			sex: 'F',
+			vote: 'super',
+			ts: ts2,
+		});
+		expect(result?.updatedAt).toBe(Math.max(ts1, ts2));
+	});
+
+	it('getVotes returns null for an unknown partner', async () => {
+		const { env } = kvAndDb();
+		const id = await createSession(env);
+		// No addPartner, no appendVotes — 'ghost' has no rows in D1.
+
+		const result = await getVotes(env, id, 'ghost');
+
+		expect(result).toBeNull();
+	});
+
+	it('getMatches reads via D1 when db is present', async () => {
+		const { env } = kvAndDb();
+		const id = await createSession(env);
+		await addPartner(env, id, 'alex');
+		await addPartner(env, id, 'laura');
+
+		const ts = Date.now();
+		await appendVotes(env, id, 'alex', [
+			{ name: 'Aaden', sex: 'M', vote: 'yes', ts },
+		]);
+		await appendVotes(env, id, 'laura', [
+			{ name: 'Aaden', sex: 'M', vote: 'yes', ts: ts + 1 },
+		]);
+
+		const result = await getMatches(env, id);
+
+		expect(result.matches).toHaveLength(1);
+		expect(result.matches[0].name).toBe('Aaden');
+		expect(result.matches[0].sex).toBe('M');
+		expect(result.matches[0].superSlugs).toHaveLength(0);
 	});
 });

@@ -1,22 +1,28 @@
 /**
- * KV-backed session and vote storage, with best-effort D1 dual-write.
+ * Session and vote storage.
  *
- * Key schema (KV — canonical for all reads):
+ * Key schema (KV — hot state, fallback when D1 unavailable):
  *   session:{sessionId}:meta           → SessionMeta
  *   session:{sessionId}:partner:{slug} → PartnerVotes
  *
- * D1 (shadow-write only, never read back here):
+ * D1 (canonical read source when env.db is present):
  *   sessions  — one row per createSession call
  *   partners  — one row per addPartner call
  *   votes     — one row per vote in appendVotes
+ *
+ * Read strategy: `getVotes` reads from D1 when `env.db !== null`; falls back
+ * to KV otherwise (local dev, unit tests that omit the D1 fixture).
+ *
+ * Write strategy: `appendVotes` still dual-writes to both KV and D1.  The KV
+ * write will be removed once W2.2a has soaked in production for ~one week
+ * (see W2.2b in PHASE-1.5.md).
  *
  * API design: functions accept a `SessionEnv` object `{ kv, db }` rather than
  * a bare `KVNamespace`.  Callers pass `{ kv: platform.env.VOTES, db: platform.env.DB }`.
  * `db` is nullable so callers and tests can omit it when D1 is unavailable.
  *
  * D1 writes are best-effort: any failure is logged via console.warn and
- * swallowed.  KV is the user's source of truth; a D1 failure must not break
- * the swipe path.
+ * swallowed.  A D1 failure must not break the swipe path.
  */
 
 export type Vote = 'yes' | 'no' | 'super';
@@ -178,14 +184,54 @@ async function insertPartnerD1(
 
 /**
  * Retrieves all votes for a given partner within a session.
- * Returns null if no votes have been recorded yet for this partner.
+ *
+ * When `env.db` is present, reads from D1 (canonical source). The query
+ * joins through `partners` so only a `session_id + slug` pair is required —
+ * callers never need to know the internal `partner_id`. Rows are ordered by
+ * `ts ASC` so the returned array reflects the chronological swipe order.
+ *
+ * `updatedAt` is the maximum `ts` across all returned vote rows.
+ *
+ * Zero D1 rows → `null`. This covers:
+ *   - Unknown partners (no partner row exists in D1).
+ *   - Old KV-only sessions that pre-date W2.1 dual-write — accepted data loss.
+ *
+ * When `env.db` is null, falls back to KV exactly as before. Unit tests that
+ * pass `{ kv, db: null }` are unaffected.
  */
 export async function getVotes(
 	env: SessionEnv,
 	sessionId: string,
 	partnerSlug: string,
 ): Promise<PartnerVotes | null> {
-	return env.kv.get<PartnerVotes>(partnerKey(sessionId, partnerSlug), 'json');
+	if (env.db === null) {
+		return env.kv.get<PartnerVotes>(partnerKey(sessionId, partnerSlug), 'json');
+	}
+
+	const { results } = await env.db
+		.prepare(
+			`SELECT v.name, v.sex, v.vote, v.ts
+			FROM votes v
+			JOIN partners p ON p.id = v.partner_id
+			WHERE p.session_id = ? AND p.slug = ?
+			ORDER BY v.ts ASC`,
+		)
+		.bind(sessionId, partnerSlug)
+		.all<{ name: string; sex: 'M' | 'F'; vote: Vote; ts: number }>();
+
+	if (results.length === 0) {
+		return null;
+	}
+
+	return {
+		votes: results.map((r) => ({
+			name: r.name,
+			sex: r.sex,
+			vote: r.vote,
+			ts: r.ts,
+		})),
+		updatedAt: Math.max(...results.map((r) => r.ts)),
+	};
 }
 
 /**
@@ -248,7 +294,8 @@ export async function appendVotes(
  * If the session has fewer than 2 partners, matches is always an empty array
  * because there is no one to match with.
  *
- * Reads from KV only. D1 is never consulted here.
+ * Delegates reads to `getVotes`, which reads from D1 when `env.db` is present
+ * and falls back to KV otherwise.
  */
 export async function getMatches(
 	env: SessionEnv,
