@@ -38,12 +38,20 @@ Foundational work that's a precondition for inviting strangers. Originally bundl
 
 - Migrate vote storage from KV to D1; KV stays for hot session state (deck cursor, etc.).
 - Schema: `users`, `sessions`, `partners`, `votes`, `name_meta`.
-- Magic-link auth via Resend or similar. Anonymous sessions still work without auth.
+- Magic-link auth via Resend or similar. Anonymous sessions still work without auth. Privacy policy ships with this — auth introduces PII, so deferring auth defers the policy.
 - Stats page: like rate, mutual likes, disagreement list.
 - PWA: manifest, service worker caches bundle and dataset, install banner.
 - Export shortlist (JSON + printable HTML).
 - Post-deck shortlist pass: once partners have a matches set, give them a "narrow this to a top 5" mode. Different intent (decision) than the main deck (discovery). Storage probably a new KV key per session, or localStorage if it stays personal.
 - Bump GitHub Actions runner deps before Node 20 EOL (hard deadline 2026-09-16): `actions/checkout`, `actions/setup-node`, `cloudflare/wrangler-action`, `pnpm/action-setup`.
+- About page + shared footer rendering SSA / Behind the Name attribution in-app (not just README). Closes the CLAUDE.md attribution gap.
+- OpenGraph + Twitter card meta tags so shared session URLs unfurl with brand artwork.
+- Cloudflare Web Analytics — first-party, cookie-less; consistent with the About page's "no third-party analytics" promise.
+- Session TTL / data retention: prune inactive sessions on a schedule; About page copy stays honest about the actual retention window.
+- Rate limiting on session create and vote append (Cloudflare rules) so the public flip can't be cheaply abused.
+- Custom 404 / error page on-brand (coral/sage, DM Sans).
+- Robots.txt + initial sitemap.xml (`/`, `/about`); per-name URLs come in Phase 2.
+- D1 backup posture: decide between accepted-loss-and-document, scheduled R2 export, or on-demand backup. **TBD.**
 - Open the GitHub repo. README links to live demo.
 
 DoD: post link in name-nerd subreddits; get unprompted "I used this with my partner" replies; nothing breaks under that load.
