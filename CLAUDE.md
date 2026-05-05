@@ -7,6 +7,7 @@ See:
 - `docs/ARCHITECTURE.md` — stack decisions and rationale
 - `docs/PHASE-0.md` — Phase 0 scope (shipped)
 - `docs/PHASE-1.md` — Phase 1 scope (shipped)
+- `docs/PHASE-1.5.md` — Phase 1.5 scope (active phase)
 
 ## Quick start
 
@@ -24,7 +25,7 @@ pnpm build:names  # regenerate static/names.json from data/ssa + data/btn
 
 - **Frontend**: SvelteKit + TypeScript + Tailwind
 - **Hosting**: Cloudflare Pages (uses `@sveltejs/adapter-cloudflare`, which gives us Workers for server routes)
-- **Storage**: Cloudflare KV (D1 deferred to a later phase)
+- **Storage**: Cloudflare KV for hot session state (deck cursor, etc.); Cloudflare D1 for vote storage (Phase 1.5 migration in progress, see `migrations/`)
 - **Lint/format**: Biome
 - **Data**: SSA national + Behind the Name (CC BY-SA), preprocessed at build time into `static/names.json`
 
@@ -46,6 +47,7 @@ Full routing table: `@memory/cloudflare-platform.md`. For local dev (`pnpm dev`,
 - `src/lib/server/` — server-only modules; never import from client code
 - `static/names.json` — preprocessed name dataset served from CDN edge
 - `scripts/build-names.ts` — build-time dataset preprocessor (Node via tsx)
+- `migrations/` — D1 schema migrations; apply with `wrangler d1 migrations apply bramble`
 - `data/` — gitignored cache for raw SSA + BTN inputs
 
 ## Conventions
