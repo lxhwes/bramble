@@ -6,7 +6,10 @@
 
 <main class="flex min-h-screen flex-col items-center justify-center gap-8 px-4">
 	<div class="flex flex-col items-center text-center">
-		<img src="/logo.png" alt="Bramble" class="h-40 w-40" />
+		<svg viewBox="0 0 100 100" aria-hidden="true" class="h-40 w-40">
+			<circle cx="40" cy="60" r="22" class="fill-coral-500" />
+			<circle cx="62" cy="62" r="22" class="fill-coral-400" />
+		</svg>
 		<h1 class="mt-4 text-5xl font-bold tracking-tight text-gray-900">Bramble</h1>
 		<p class="mt-3 text-lg text-gray-500">Swipe baby names. Find mutual matches.</p>
 	</div>
