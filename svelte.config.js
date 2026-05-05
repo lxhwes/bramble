@@ -7,7 +7,10 @@ const config = {
 		runes: ({ filename }) =>
 			filename.split(/[/\\]/).includes('node_modules') ? undefined : true,
 	},
-	kit: { adapter: adapter() },
+	kit: {
+		adapter: adapter(),
+		serviceWorker: { register: process.env.NODE_ENV === 'production' },
+	},
 };
 
 export default config;
