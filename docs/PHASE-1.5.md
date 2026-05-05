@@ -1,6 +1,6 @@
 # Phase 1.5: Public launch prep
 
-**Status:** Wave 1 shipped 2026-05-04 (W1.5 partial — see Outstanding). Wave 2 partial — W2.1 and W2.4 shipped 2026-05-04; W2.2 and W2.3 deferred. See `ROADMAP.md` for the phase goal and DoD; this file is the executable task list.
+**Status:** Wave 1 shipped 2026-05-04 (W1.5 partial — see Outstanding). Wave 2 partial — W2.1 and W2.4 shipped 2026-05-04; W2.2a shipped 2026-05-05; W2.2b and W2.3 deferred. See `ROADMAP.md` for the phase goal and DoD; this file is the executable task list.
 
 Goal: foundational work that's a precondition for inviting strangers — D1 migration, magic-link auth, PWA, stats, export, shortlist mode, runner deps bump, public repo.
 
@@ -77,12 +77,19 @@ Hold all of these until W1.6 has merged so `sessions.ts` stays clear of merge co
 - Vitest fixture compares both stores for parity.
 - Commit: `feat(db): dual-write votes to KV and D1`.
 
-### W2.2 — D1 read cutover (PR-3 of 3) — deferred
+### W2.2a — D1 read cutover `f165d51`
 
-- Flip reads to D1. KV becomes hot-state-only (cursor, recent-votes ring buffer).
-- Remove the dual-write fallback once parity holds in production for a week.
+- Modify: `src/lib/server/sessions.ts` — `getVotes` now reads from D1 via JOIN on partners (session_id + slug → partner_id → votes), ordered by `ts ASC`.
+- `getMatches` auto-flips since it delegates to `getVotes`. KV dual-write retained as safety net.
+- `updatedAt` = max(votes.ts) for the partner; result is `null` when D1 has no rows (covers old KV-only sessions — accepted data loss).
+- Falls back to KV when `env.db` is null so unit tests without a D1 fixture keep working.
 - Commit: `feat(db): read votes from D1; KV demoted to hot state`.
-- **Held:** wants production-soak validation of W2.1's parity before flipping. Re-evaluate after Wave 2 has been live one week.
+
+### W2.2b — Remove dual-write fallback — deferred
+
+- Remove the KV dual-write from `appendVotes` once W2.2a has soaked in production for ~one week.
+- Commit: `feat(db): remove KV dual-write; D1 is canonical`.
+- **Held:** waiting for ~one week production soak of W2.2a.
 
 ### W2.3 — Magic-link auth via Resend — deferred
 
