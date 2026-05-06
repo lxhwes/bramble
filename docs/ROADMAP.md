@@ -56,6 +56,23 @@ Foundational work that's a precondition for inviting strangers. Originally bundl
 
 DoD: post link in name-nerd subreddits; get unprompted "I used this with my partner" replies; nothing breaks under that load.
 
+## Phase 1.6 — Self-host target
+
+Goal: a fork-and-run path that does not require a Cloudflare account. The W1.5 repo-public flip is gated on this so first-time visitors who do not want to depend on the maintainer's Cloudflare tenancy have an out.
+
+Slotted between Phase 1.5 close and the W1.5 repo-public flip. Cloudflare Pages remains the canonical deploy target — self-host is parity-or-skip, never the lead. Effort is low because D1 is SQLite under the hood, `better-sqlite3` is already a devDep (used by the test path), and storage already takes a `SessionEnv { kv, db }` object so the integration seam is narrow.
+
+- Storage abstraction: thin `BrambleKV` / `BrambleDB` interfaces wrapping only the surface used today (`get<T>(key, 'json')` / `put`; `prepare().bind().run/first/all`). Cloudflare impls are pass-throughs; Node impls back onto `better-sqlite3` plus a `kv` table.
+- Adapter switch: `BRAMBLE_TARGET=node|cloudflare` env var picks `@sveltejs/adapter-node` or `@sveltejs/adapter-cloudflare` at build time. Default stays `cloudflare`.
+- `src/hooks.server.ts` boot singleton populates `event.locals.kv` / `event.locals.db` on the Node target. Every server route switches from `platform.env.VOTES`/`platform.env.DB` to a single `getStorage(event)` helper that returns the same shape on either target.
+- Dockerfile (multi-stage Debian-slim base for `better-sqlite3` native build) plus `docker-compose.yml` with a SQLite volume and documented env vars. `pnpm db:migrate:local` equivalent runs at container start.
+- Node-side equivalents for Cloudflare-only Phase 1.5 features: in-process rate limiter (replaces W3.4 dashboard rules), `pnpm prune` script + host cron line (replaces W3.3 Cron Trigger), conditional Web Analytics beacon (W3.2 skipped on Node), `sqlite3 .backup` cron documented (replaces W3.7 Time Travel).
+- Magic-link auth (W2.3) ships disabled by default for self-hosters; URL-shared anonymous sessions remain the primary mode.
+- Feature matrix in `ARCHITECTURE.md` recording Cloudflare-vs-Node behaviour for every Phase 1.5+ feature. New phases must fill it in.
+- README "Self-host" section plus a `PHASE-1.6.md` executable task list when the phase becomes active.
+
+DoD: `docker compose up` on a clean host brings up the app on a documented port; two browsers can join the same session and see mutual matches without any Cloudflare account; shortlist add/remove and JSON/HTML export work; the canonical Cloudflare deploy stays green via `pnpm build && wrangler pages deploy`; `pnpm test` and `pnpm check` pass on both target builds.
+
 ## Phase 2 — Feature Parity with Free Nameberry
 
 Goal: a stranger arrives via Google for "Norse boy names," lands on a name detail page, signs up, completes a couple swipe session.
