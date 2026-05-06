@@ -16,7 +16,8 @@ SvelteKit on Cloudflare Pages and Workers, with name data preprocessed from SSA 
 
 ```bash
 pnpm install
-pnpm dev               # vite dev server (local KV via wrangler)
+pnpm db:migrate:local  # apply D1 migrations to the local emulator (run after fresh checkout or new migration)
+pnpm dev               # vite dev server (local KV + D1 via wrangler)
 pnpm check             # wrangler types + svelte-check (zero warnings)
 pnpm test              # vitest
 pnpm build             # production build via adapter-cloudflare

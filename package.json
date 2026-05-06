@@ -12,6 +12,7 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"gen": "wrangler types",
 		"build:names": "tsx scripts/build-names.ts",
+		"db:migrate:local": "wrangler d1 migrations apply bramble --local",
 		"lint": "biome check .",
 		"format": "biome format --write .",
 		"test": "vitest run",

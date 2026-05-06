@@ -13,7 +13,8 @@ See:
 
 ```bash
 pnpm install
-pnpm dev          # Vite dev server (local KV via wrangler)
+pnpm db:migrate:local # apply D1 migrations to the local emulator (after fresh checkout or new migration)
+pnpm dev          # Vite dev server (local KV + D1 via wrangler)
 pnpm check        # wrangler types + svelte-check (zero warnings required)
 pnpm lint         # Biome (ignores .svelte; svelte-check covers those via pnpm check)
 pnpm test         # Vitest (node env)
