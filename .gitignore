@@ -27,3 +27,6 @@ data/
 
 # Local Claude Code config (per-developer)
 .claude/
+
+# Playwright CLI artifacts (snapshots, console logs)
+.playwright-cli/
