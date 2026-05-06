@@ -1,6 +1,6 @@
 # Phase 1.5: Public launch prep
 
-**Status:** Wave 1 shipped 2026-05-04 (W1.5 partial — see Outstanding). Wave 2 partial — W2.1 and W2.4 shipped 2026-05-04; W2.2a shipped 2026-05-05; W2.2b and W2.3 deferred. Wave 3 partial — W3.0 shipped 2026-05-05; W3.1–W3.7 planned, runs in parallel with W2.2b's soak window. Out-of-band: Phase 1's outstanding BTN data drop closed out 2026-05-05 with a narrower data model (related synonyms only, no origin/meaning) — see `ROADMAP.md` Phase 1 entry. See `ROADMAP.md` for the phase goal and DoD; this file is the executable task list.
+**Status:** Wave 1 shipped 2026-05-04 (W1.5 partial — see Outstanding). Wave 2 partial — W2.1 and W2.4 shipped 2026-05-04; W2.2a shipped 2026-05-05; W2.2b and W2.3 deferred. Wave 3 partial — W3.0 shipped 2026-05-05; W3.5/W3.6/W3.7 shipped 2026-05-06; W3.1–W3.4 planned, runs in parallel with W2.2b's soak window. Out-of-band: Phase 1's outstanding BTN data drop closed out 2026-05-05 with a narrower data model (related synonyms only, no origin/meaning) — see `ROADMAP.md` Phase 1 entry. Phase 1.6 self-host target slotted between Phase 1.5 close and the W1.5 repo-public flip — see `ROADMAP.md`. See `ROADMAP.md` for the phase goal and DoD; this file is the executable task list.
 
 Goal: foundational work that's a precondition for inviting strangers — D1 migration, magic-link auth, PWA, stats, export, shortlist mode, runner deps bump, public repo.
 
@@ -145,25 +145,25 @@ Launch-readiness items. Disjoint files; can land in any order. All must merge be
 - Configure via Cloudflare dashboard if possible; otherwise minimal middleware in `src/hooks.server.ts`.
 - Commit: `chore(infra): rate-limit session create and vote append` (only if app-side change is needed; dashboard rules don't require a commit).
 
-### W3.5 — Custom 404 / error page
+### W3.5 — Custom 404 / error page `93b5a1a`
 
 - New: `src/routes/+error.svelte` — branded error page covering 404 and 5xx.
 - Coral/sage palette + DM Sans, with links back to `/` and `/about`.
-- Commit: `feat(errors): custom error page`.
+- Shipped 2026-05-06.
 
-### W3.6 — Robots.txt + sitemap.xml
+### W3.6 — Robots.txt + sitemap.xml `8802c4b`
 
-- New: `static/robots.txt` — allow-all for now; tighten in Phase 2 when per-name routes ship.
-- New: `src/routes/sitemap.xml/+server.ts` — initial sitemap with `/` and `/about`. Phase 2 extends with per-name URLs.
-- Commit: `feat(seo): robots.txt and initial sitemap`.
+- `static/robots.txt` — allow-all for now; tighten in Phase 2 when per-name routes ship. (Predated W3.6; left in place.)
+- New: `src/routes/sitemap.xml/+server.ts` — initial sitemap with `/` and `/about`, absolute URLs derived from the request origin. Phase 2 extends with per-name URLs.
+- Shipped 2026-05-06.
 
-### W3.7 — D1 backup posture (decided 2026-05-05)
+### W3.7 — D1 backup posture (decided 2026-05-05) `fa6ad14`
 
 - Cloudflare D1 Time Travel provides automatic point-in-time recovery for the last 7 days; that's the canonical backup. Restore via `wrangler d1 time-travel restore`.
 - Pre-migration discipline: maintainer runs `wrangler d1 export bramble --output=...` before any risky migration as a belt-and-suspenders snapshot.
 - Older-than-7-day data loss is accepted (personal-tool grade; swipe votes lose meaning after a name decision).
-- Implementation: add a short paragraph in `ARCHITECTURE.md` capturing this policy. No automation to build.
-- Commit: `docs(architecture): record d1 backup posture`.
+- Implementation: short subsection in `ARCHITECTURE.md` capturing this policy. No automation to build.
+- Shipped 2026-05-06.
 
 ## Anti-tasks (NOT in Phase 1.5)
 
