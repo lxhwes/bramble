@@ -56,6 +56,14 @@ name_meta (name, sex, peak_year, total, ...)  -- dormant; populated only if main
 
 KV continues to hold the hot deck cursor per partner.
 
+## D1 backup posture
+
+Cloudflare D1 Time Travel provides automatic point-in-time recovery for the last 7 days. That's the canonical backup. Restore via `wrangler d1 time-travel restore bramble --timestamp=<iso8601>`.
+
+Pre-migration discipline: maintainer runs `wrangler d1 export bramble --output=backups/<date>-pre-migration.sql` before any risky migration as a belt-and-suspenders snapshot. The export file is gitignored — store it locally or upload to R2 if longer retention matters for that specific migration.
+
+Older-than-7-day data loss is accepted. Bramble is personal-tool grade; swipe votes lose meaning shortly after a name decision is made, and a hard recovery scenario beyond a week of history isn't worth the automation cost. No backup automation, no cron-driven exports, no off-platform replication.
+
 ## Deployment
 
 - `wrangler pages deploy` from CI on push to `main`.
