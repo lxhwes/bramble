@@ -64,6 +64,7 @@ Six items below touch disjoint files and can land in any order. Plan rationale l
 
 - **W1.5 README polish — public-launch copy.** The "Status: early development — Phase 0" line is intentionally untouched per maintainer instruction; live demo link and screenshot are likewise deferred. These flip together with the repo's GitHub visibility setting in a follow-up commit when the maintainer is ready.
 - **W1.2 PWA icons.** `static/icons/icon-192.png` and `icon-512.png` are solid-coral placeholders. Replace with real branded artwork before public launch.
+- **W1.3 Favicon.** `static/favicon.svg` is a coral-on-cream "b" placeholder. Replace with the real mark once logo selection from `logo-ideas.md` is finalized.
 - **W1.1 CI verification.** The actions bump landed on `main`; first push validates the bumped runners on a real deploy.
 
 ## Wave 2 (sequenced after W1.6 lands)
