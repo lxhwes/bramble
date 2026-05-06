@@ -22,6 +22,7 @@ import {
 	writeFileSync,
 } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
+import { fileURLToPath } from 'node:url';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -32,8 +33,7 @@ interface NameEntry {
 	sex: 'M' | 'F';
 	peakYear: number;
 	totalCount: number;
-	origin?: string;
-	meaning?: string;
+	related?: string[];
 }
 
 // Intermediate accumulator keyed by `name|sex`
@@ -198,75 +198,47 @@ function buildNameEntries(
 // ---------------------------------------------------------------------------
 // BTN enrichment
 //
-// Manual fetch: https://www.behindthename.com/ (exact download path depends on
-// your account — the maintainer must retrieve it manually).
-// Place the downloaded file(s) in data/btn/ (gitignored; never committed).
+// Manual fetch: https://www.behindthename.com/ (the bulk synonyms export the
+// maintainer downloads). Place file(s) in data/btn/ (gitignored).
 // Only the processed static/names.json ships.
 //
-// Expected JSON shape: [{ "name": "Olivia", "origin": "Latin", "meaning": "olive tree" }, ...]
-// Expected CSV shape:  header row `name,origin,meaning` then one entry per line.
+// Expected file: TSV with `#`-prefixed comment header. After the comment block,
+// each line is `<name>\t<gender>\t<comma-separated related names>`.
+// Sample:        Aaden\tm\tAden,Aidan,Aiden,Aydan,Ayden
 //
-// License: CC BY-SA 4.0 — attribution required; redistribution permitted.
+// License: the bulk export is declared CC BY-SA 4.0 in its file header — a
+// distinct license grant from BTN's website terms. Attribution required;
+// redistribution permitted.
 // ---------------------------------------------------------------------------
 
 interface BtnRecord {
-	origin: string;
-	meaning: string;
+	related: string[];
 }
 
-// Minimal JSON BTN record — only fields we consume are required.
-interface BtnJsonRow {
-	name: string;
-	origin: string;
-	meaning: string;
-	// BTN exports may include `gender` or `sex`; we don't need either for enrichment.
-	[key: string]: string;
-}
-
-function parseBtnJson(raw: string, file: string): Map<string, BtnRecord> {
-	const rows = JSON.parse(raw) as BtnJsonRow[];
+export function parseBtnTsv(raw: string): Map<string, BtnRecord> {
 	const out = new Map<string, BtnRecord>();
-	for (const row of rows) {
-		if (typeof row.name !== 'string' || !row.name) continue;
-		const origin = typeof row.origin === 'string' ? row.origin : '';
-		const meaning = typeof row.meaning === 'string' ? row.meaning : '';
-		out.set(row.name.toLowerCase(), { origin, meaning });
-	}
-	process.stderr.write(
-		`[build-names] BTN JSON ${file}: loaded ${out.size} records.\n`,
-	);
-	return out;
-}
+	for (const line of raw.split('\n')) {
+		// Skip blank lines and comment lines (the file header and the column-name comment).
+		if (line === '' || line.startsWith('#')) continue;
 
-function parseBtnCsv(raw: string, file: string): Map<string, BtnRecord> {
-	// Simple split-on-comma parser. Does not handle quoted fields containing commas —
-	// if a future BTN export uses quoted CSV, replace this with a quoted-field-aware splitter.
-	const lines = raw.split('\n').filter((l) => l.trim() !== '');
-	if (lines.length === 0) return new Map();
+		const parts = line.split('\t');
+		// A valid row has name, gender, related — three tab-separated fields.
+		if (parts.length < 3) continue;
 
-	const header = lines[0].split(',').map((h) => h.trim().toLowerCase());
-	const nameIdx = header.indexOf('name');
-	const originIdx = header.indexOf('origin');
-	const meaningIdx = header.indexOf('meaning');
-
-	if (nameIdx === -1 || originIdx === -1 || meaningIdx === -1) {
-		throw new Error(
-			`Missing required columns (name, origin, meaning) in ${file}; found: ${header.join(', ')}`,
-		);
-	}
-
-	const out = new Map<string, BtnRecord>();
-	for (const line of lines.slice(1)) {
-		const cols = line.split(',');
-		const name = cols[nameIdx]?.trim() ?? '';
+		const name = parts[0].trim();
 		if (!name) continue;
-		const origin = cols[originIdx]?.trim() ?? '';
-		const meaning = cols[meaningIdx]?.trim() ?? '';
-		out.set(name.toLowerCase(), { origin, meaning });
+
+		const rawRelated = parts[2].trim();
+		const related =
+			rawRelated === ''
+				? []
+				: rawRelated
+						.split(',')
+						.map((s) => s.trim())
+						.filter((s) => s !== '');
+
+		out.set(name.toLowerCase(), { related });
 	}
-	process.stderr.write(
-		`[build-names] BTN CSV ${file}: loaded ${out.size} records.\n`,
-	);
 	return out;
 }
 
@@ -281,12 +253,10 @@ function loadBtnData(): Map<string, BtnRecord> {
 		return result;
 	}
 
-	const files = readdirSync(btnDir).filter(
-		(f) => f.endsWith('.json') || f.endsWith('.csv') || f.endsWith('.txt'),
-	);
+	const files = readdirSync(btnDir).filter((f) => f.endsWith('.txt'));
 	if (files.length === 0) {
 		process.stderr.write(
-			'[build-names] data/btn/ is empty; skipping BTN enrichment.\n',
+			'[build-names] data/btn/ has no .txt files; skipping BTN enrichment.\n',
 		);
 		return result;
 	}
@@ -295,14 +265,8 @@ function loadBtnData(): Map<string, BtnRecord> {
 		const filePath = `${btnDir}/${file}`;
 		try {
 			const raw = readFileSync(filePath, 'utf8');
-			let parsed: Map<string, BtnRecord>;
-			if (file.endsWith('.json')) {
-				parsed = parseBtnJson(raw, file);
-			} else {
-				// .csv or .txt — treat as header-row CSV
-				parsed = parseBtnCsv(raw, file);
-			}
-			// Last-write-wins on duplicate name keys across files
+			const parsed = parseBtnTsv(raw);
+			// Last-write-wins on duplicate name keys across files.
 			for (const [key, record] of parsed) {
 				result.set(key, record);
 			}
@@ -326,12 +290,10 @@ function enrichWithBtn(
 ): NameEntry[] {
 	if (btnData.size === 0) return entries;
 
-	// Merge BTN data into entries by name (case-insensitive key).
-	// When BTN data is properly loaded, this will populate origin and meaning.
 	return entries.map((entry) => {
 		const record = btnData.get(entry.name.toLowerCase());
-		if (record === undefined) return entry;
-		return { ...entry, origin: record.origin, meaning: record.meaning };
+		if (record === undefined || record.related.length === 0) return entry;
+		return { ...entry, related: record.related };
 	});
 }
 
@@ -373,7 +335,11 @@ async function main(): Promise<void> {
 	);
 }
 
-main().catch((err: unknown) => {
-	process.stderr.write(`[build-names] Fatal error: ${String(err)}\n`);
-	process.exit(1);
-});
+// Only run the build pipeline when invoked as a script (e.g. `pnpm build:names`).
+// Importing this module from tests should not trigger SSA download or names.json writes.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+	main().catch((err: unknown) => {
+		process.stderr.write(`[build-names] Fatal error: ${String(err)}\n`);
+		process.exit(1);
+	});
+}

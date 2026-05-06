@@ -12,7 +12,7 @@ describe('parseBtnTsv', () => {
 			'Aaden\tm\tAden,Aidan',
 		].join('\n');
 
-		const out = parseBtnTsv(raw, 'fixture.txt');
+		const out = parseBtnTsv(raw);
 
 		expect(out.size).toBe(1);
 		expect(out.has('aaden')).toBe(true);
@@ -21,7 +21,7 @@ describe('parseBtnTsv', () => {
 	it('splits on tabs and stores the related list as a string array', () => {
 		const raw = ['Aaden\tm\tAden,Aidan,Aiden,Aydan,Ayden'].join('\n');
 
-		const record = parseBtnTsv(raw, 'fixture.txt').get('aaden');
+		const record = parseBtnTsv(raw).get('aaden');
 
 		expect(record).toEqual({
 			related: ['Aden', 'Aidan', 'Aiden', 'Aydan', 'Ayden'],
@@ -31,7 +31,7 @@ describe('parseBtnTsv', () => {
 	it('returns an empty related array when the field is empty', () => {
 		const raw = ['Aafje\tf\t'].join('\n');
 
-		const record = parseBtnTsv(raw, 'fixture.txt').get('aafje');
+		const record = parseBtnTsv(raw).get('aafje');
 
 		expect(record).toEqual({ related: [] });
 	});
@@ -39,7 +39,7 @@ describe('parseBtnTsv', () => {
 	it('passes through "mf" (unisex) entries — match key is name only', () => {
 		const raw = ['Aaren\tmf\tAaron,Arron'].join('\n');
 
-		const record = parseBtnTsv(raw, 'fixture.txt').get('aaren');
+		const record = parseBtnTsv(raw).get('aaren');
 
 		expect(record).toEqual({ related: ['Aaron', 'Arron'] });
 	});
@@ -47,7 +47,7 @@ describe('parseBtnTsv', () => {
 	it('lowercases the lookup key so SSA names match BTN entries', () => {
 		const raw = ['Aaliyah\tf\tAleah,Alia,Aliya'].join('\n');
 
-		const out = parseBtnTsv(raw, 'fixture.txt');
+		const out = parseBtnTsv(raw);
 
 		expect(out.has('aaliyah')).toBe(true);
 		expect(out.has('Aaliyah')).toBe(false);
@@ -58,7 +58,7 @@ describe('parseBtnTsv', () => {
 			'\n',
 		);
 
-		const out = parseBtnTsv(raw, 'fixture.txt');
+		const out = parseBtnTsv(raw);
 
 		expect(out.size).toBe(2);
 		expect(out.has('aaden')).toBe(true);
