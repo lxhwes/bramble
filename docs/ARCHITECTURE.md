@@ -24,7 +24,7 @@ Names data is bundled as a single `static/names.json` produced by `scripts/build
 
 The build script merges:
 - **SSA national data** (`names.zip` from ssa.gov) — public domain, gives us name + sex + year frequency from 1880 onward.
-- **Behind the Name CC BY-SA download** — name + gender + origin + meaning + synonyms.
+- **Behind the Name bulk synonyms export** (`data/btn/btn_givennames_synonyms.txt`) — name + gender + comma-separated related-name synonyms. The bulk file declares CC BY-SA 4.0 in its own header (a separate license grant from BTN's website terms). BTN's lookup API does not expose etymology or meaning text — those are website-only — so origin/meaning are not part of the bundled dataset.
 
 For Phase 0 we filter to names appearing ≥100 times in any year between 1995 and 2024. Yields ~3–5k names, manageable card deck size, reasonable popularity floor.
 
@@ -42,15 +42,17 @@ session:{sessionId}:meta
 
 That's it. Match view loads all partner keys for a session, intersects the `yes` votes by name, returns the list.
 
-### Phase 1.5 (D1, sketch only — deferred)
+### Phase 1.5 (D1)
 
 ```sql
 users (id, email, created_at)
 sessions (id, owner_user_id, name, created_at)
 partners (id, session_id, user_id?, slug, display_name)
 votes (id, partner_id, name_slug, vote, created_at)
-name_meta (slug, name, sex, origin, meaning, ...)
+name_meta (name, sex, peak_year, total, ...)  -- dormant; populated only if maintainer decides to move name attributes out of static/names.json
 ```
+
+`users`, `sessions`, `partners`, and `votes` are live (W1.6 + W2.1 + W2.2a). `name_meta` exists in `migrations/0001_init.sql` but is unwritten. Its `origin` / `meaning` columns are vestigial post-2026-05-05 BTN closeout; if `name_meta` is ever populated, a follow-up migration will drop those columns and add a `related` column.
 
 KV continues to hold the hot deck cursor per partner.
 

@@ -16,13 +16,13 @@ Goal: maintainer + spouse use Bramble daily without papercuts. Personal-tool-gra
 
 Shipped under `PHASE-1.md` (filters, resume, undo, name detail bottom-sheet, share + switch partner, BTN merge script, UX polish) plus a same-day follow-up wave: resume cookie refresh on join, partner-progress badge, live match toast, slug persistence + collision detection, web share API + QR fallback, coral/sage brand palette + DM Sans, super-like attribution on the matches view, tap-button vote input.
 
-Outstanding under this phase: BTN dataset still needs a manual export drop into `data/btn/` to populate origin/meaning. Bottom-sheet shows `—` for those fields until then.
+Outstanding under this phase: closed out 2026-05-05 during the 1.5 cycle with a narrower data model than originally planned. Behind the Name's lookup API does not expose etymology or meaning text — those fields are website-only — so origin/meaning were dropped entirely. The CC-BY-SA bulk export `data/btn/btn_givennames_synonyms.txt` ships its `related` (synonym/variant) column instead, which now surfaces as a "Related" row in the bottom-sheet when present. See commits `b6e20bc` / `7762d22` / `b447a37`.
 
 DoD met:
 - Two phones, same session: resume mid-deck across reloads without losing position.
 - Filter bar (gender, era, popularity, starts-with) survives reload via URL params.
 - Undo button + `Z` key reverse the last 5 votes before they flush to the server.
-- Tap a card to open a bottom-sheet with origin, meaning, peak year, total count.
+- Tap a card to open a bottom-sheet with peak year, total count, and (when BTN has synonyms) a "Related" names row. Origin/meaning rows were originally planned but dropped 2026-05-05 — BTN does not expose that data via any redistributable channel.
 - Share button copies the bare `/s/{id}` URL; switch-partner returns to the join form.
 - Landing page surfaces a resume link when the `bramble_last_session` cookie is set.
 - Coral/sage brand palette + DM Sans, polished swipe animations, larger cards.

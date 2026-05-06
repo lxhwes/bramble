@@ -1,6 +1,6 @@
 # Phase 1.5: Public launch prep
 
-**Status:** Wave 1 shipped 2026-05-04 (W1.5 partial — see Outstanding). Wave 2 partial — W2.1 and W2.4 shipped 2026-05-04; W2.2a shipped 2026-05-05; W2.2b and W2.3 deferred. Wave 3 partial — W3.0 shipped 2026-05-05; W3.1–W3.7 planned, runs in parallel with W2.2b's soak window. See `ROADMAP.md` for the phase goal and DoD; this file is the executable task list.
+**Status:** Wave 1 shipped 2026-05-04 (W1.5 partial — see Outstanding). Wave 2 partial — W2.1 and W2.4 shipped 2026-05-04; W2.2a shipped 2026-05-05; W2.2b and W2.3 deferred. Wave 3 partial — W3.0 shipped 2026-05-05; W3.1–W3.7 planned, runs in parallel with W2.2b's soak window. Out-of-band: Phase 1's outstanding BTN data drop closed out 2026-05-05 with a narrower data model (related synonyms only, no origin/meaning) — see `ROADMAP.md` Phase 1 entry. See `ROADMAP.md` for the phase goal and DoD; this file is the executable task list.
 
 Goal: foundational work that's a precondition for inviting strangers — D1 migration, magic-link auth, PWA, stats, export, shortlist mode, runner deps bump, public repo.
 
@@ -172,12 +172,11 @@ Launch-readiness items. Disjoint files; can land in any order. All must merge be
 - Couple style analysis / Baby Name DNA (Phase 2).
 - User-created lists or themed-list auto-generation (Phase 2).
 - Multi-partner sessions as a UX affordance (already works at the URL level — see ROADMAP).
-- BTN data drop into `data/btn/` — that's Phase 1's outstanding item, not 1.5 work.
 
 If a task seems implied but isn't here, stop and ask.
 
 ## Decisions deferred to maintainer
 
 - Resend vs. another magic-link provider for W2.3.
-- Whether to ship `name_meta` rows into D1 (30k+ rows) or keep them in `static/names.json` and only put per-session vote/match data in D1.
+- Whether to populate the `name_meta` D1 table or keep all name attributes in `static/names.json`. The table's `origin`/`meaning` columns (per `migrations/0001_init.sql`) are vestigial after the 2026-05-05 BTN closeout — the live attributes are now `peak_year`, `total`, and `related` (the latter not in the migration). If the maintainer ever decides to populate `name_meta`, a follow-up migration would drop `origin`/`meaning` and add `related` (likely as a JSON-encoded TEXT column).
 - Final repo-public flip date — gated on W1.2 + W1.5 landing.
