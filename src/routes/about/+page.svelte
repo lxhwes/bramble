@@ -9,7 +9,7 @@
 <main class="mx-auto max-w-2xl space-y-8 px-4 py-12 text-gray-800">
 	<header class="space-y-2">
 		<a href="/" class="text-sm text-gray-400 underline hover:text-gray-600">← Home</a>
-		<h1 class="text-4xl font-bold tracking-tight text-gray-900">About Bramble</h1>
+		<h1 class="font-display text-4xl font-bold tracking-tight text-gray-900">About Bramble</h1>
 	</header>
 
 	<section class="space-y-3 text-lg leading-relaxed">

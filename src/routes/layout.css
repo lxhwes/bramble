@@ -30,6 +30,7 @@
 
 	/* Font */
 	--font-sans: 'DM Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+	--font-display: 'Fraunces', ui-serif, Georgia, 'Times New Roman', serif;
 }
 
 @layer base {

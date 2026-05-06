@@ -10,7 +10,7 @@
 			<circle cx="40" cy="60" r="22" class="fill-coral-500" />
 			<circle cx="62" cy="62" r="22" class="fill-coral-400" />
 		</svg>
-		<h1 class="mt-4 text-5xl font-bold tracking-tight text-gray-900">Bramble</h1>
+		<h1 class="mt-4 font-display text-5xl font-bold tracking-tight text-gray-900">Bramble</h1>
 		<p class="mt-3 text-lg text-gray-500">Swipe baby names. Find mutual matches.</p>
 	</div>
 

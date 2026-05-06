@@ -637,7 +637,7 @@
 					onpointermove={onPointerMove}
 					onpointerup={onPointerUp}
 				>
-					<span class="text-6xl font-extrabold tracking-wide">{currentCard.name}</span>
+					<span class="font-display text-6xl font-extrabold">{currentCard.name}</span>
 					<span class="text-3xl text-gray-400" aria-label={currentCard.sex === 'M' ? 'boy' : 'girl'}>
 						{currentCard.sex === 'M' ? '♂' : '♀'}
 					</span>
@@ -743,7 +743,7 @@
 				<div class="mx-auto h-1.5 w-12 rounded-full bg-gray-300"></div>
 			</div>
 			<div class="flex flex-col gap-3 px-6 pb-6">
-				<h2 class="text-center text-4xl font-bold tracking-tight">{detailEntry.name}</h2>
+				<h2 class="text-center font-display text-4xl font-bold">{detailEntry.name}</h2>
 				<p class="text-center text-2xl text-gray-400" aria-label={detailEntry.sex === 'M' ? 'boy' : 'girl'}>
 					{detailEntry.sex === 'M' ? '♂' : '♀'}
 					<span class="ml-1 text-base text-gray-500">{detailEntry.sex === 'M' ? 'Boy' : 'Girl'}</span>
