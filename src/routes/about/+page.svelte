@@ -39,8 +39,7 @@
 				to 1880 (public domain).
 			</li>
 			<li>
-				<strong>Behind the Name</strong> — name origins, meanings, and gender data, distributed
-				under
+				<strong>Behind the Name</strong> — gender and related-name data, distributed under
 				<a
 					href="https://creativecommons.org/licenses/by-sa/4.0/"
 					class="text-coral-700 underline hover:text-coral-800">CC BY-SA 4.0</a

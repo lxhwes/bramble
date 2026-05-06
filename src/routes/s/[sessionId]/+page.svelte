@@ -753,10 +753,10 @@
 					<dd class="text-gray-900">{detailEntry.peakYear}</dd>
 					<dt class="font-medium text-gray-500">Total count</dt>
 					<dd class="text-gray-900">{detailEntry.totalCount.toLocaleString()}</dd>
-					<dt class="font-medium text-gray-500">Origin</dt>
-					<dd class="text-gray-900">{detailEntry.origin ?? '—'}</dd>
-					<dt class="col-span-2 font-medium text-gray-500">Meaning</dt>
-					<dd class="col-span-2 text-gray-900">{detailEntry.meaning ?? '—'}</dd>
+					{#if detailEntry.related && detailEntry.related.length > 0}
+						<dt class="col-span-2 font-medium text-gray-500">Related</dt>
+						<dd class="col-span-2 text-gray-900">{detailEntry.related.join(', ')}</dd>
+					{/if}
 				</dl>
 			</div>
 		{/if}

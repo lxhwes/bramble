@@ -3,8 +3,7 @@ export interface NameEntry {
 	sex: 'M' | 'F';
 	peakYear: number;
 	totalCount: number;
-	origin?: string;
-	meaning?: string;
+	related?: string[];
 }
 
 export type Gender = 'm' | 'f' | 'both';
