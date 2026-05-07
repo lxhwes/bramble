@@ -1,8 +1,16 @@
 import { error } from '@sveltejs/kit';
 import { addPartner, getSessionMeta, getVotes } from '$lib/server/sessions';
+import {
+	LEGACY_COOKIE,
+	parseSessionsCookie,
+	SESSIONS_COOKIE,
+	serializeSessionsCookie,
+	upsertSession,
+} from '$lib/sessions-cookie';
 import type { PageServerLoad } from './$types';
 
 const SLUG_RE = /^[a-z0-9-]{1,32}$/;
+const COOKIE_OPTS = { path: '/', maxAge: 2592000, sameSite: 'lax' as const };
 
 export const load: PageServerLoad = async ({
 	params,
@@ -25,21 +33,34 @@ export const load: PageServerLoad = async ({
 		throw error(404, 'Session not found');
 	}
 
+	const cookieEntries = parseSessionsCookie(cookies.get(SESSIONS_COOKIE));
+	const cookieSlug =
+		cookieEntries.find((e) => e.sessionId === params.sessionId)?.slug ?? null;
+
 	if (!slugValid) {
 		return {
 			slug: null,
 			sessionId: params.sessionId,
 			partnerSlugs: meta.partnerSlugs,
+			cookieSlug,
 		};
 	}
 
 	await addPartner(env, params.sessionId, slug);
 
-	cookies.set('bramble_last_session', params.sessionId, {
-		path: '/',
-		maxAge: 2592000,
-		sameSite: 'lax',
-	});
+	const nextEntries = upsertSession(
+		cookieEntries,
+		params.sessionId,
+		slug,
+		Date.now(),
+	);
+	cookies.set(
+		SESSIONS_COOKIE,
+		serializeSessionsCookie(nextEntries),
+		COOKIE_OPTS,
+	);
+	// Dual-write the legacy cookie for one release; drop in a follow-up commit.
+	cookies.set(LEGACY_COOKIE, params.sessionId, COOKIE_OPTS);
 
 	// addPartner is idempotent — the post-join slug list is the prior list
 	// plus the joining slug if it wasn't already there. Avoids a second
@@ -65,5 +86,6 @@ export const load: PageServerLoad = async ({
 		votes: allPartnerVotes[myIndex]?.votes ?? [],
 		partnerSlugs,
 		partnerVoteCounts,
+		cookieSlug: slug,
 	};
 };

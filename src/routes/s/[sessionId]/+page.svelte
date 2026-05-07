@@ -11,6 +11,7 @@
 		type FilterState,
 		type NameEntry,
 	} from '$lib/filters';
+	import { validateJoin } from '$lib/join-validation';
 
 	interface PendingVote {
 		name: string;
@@ -26,6 +27,10 @@
 	// ---------------------------------------------------------------------------
 	let joinInput = $state('');
 	let joinError = $state<string | null>(null);
+	// Holds the slug awaiting "Continue as ‹slug›" confirmation when the slug
+	// is in use and we have no storage proof this user claimed it. URL = trust
+	// is the model: server accepts the rejoin once the user confirms.
+	let pendingConfirmSlug = $state<string | null>(null);
 
 	// Per-session localStorage key. Survives reloads so a returning partner
 	// doesn't have to retype their slug; cleared by Switch Partner.
@@ -33,22 +38,37 @@
 
 	function handleJoinSubmit(e: Event) {
 		e.preventDefault();
-		const val = joinInput.trim().toLowerCase();
-		if (!/^[a-z0-9-]{1,32}$/.test(val)) {
+		const savedSlug =
+			typeof localStorage !== 'undefined' ? localStorage.getItem(slugStorageKey) : null;
+		const result = validateJoin(joinInput, {
+			partnerSlugs: data.partnerSlugs ?? [],
+			savedSlug,
+			cookieSlug: data.cookieSlug ?? null,
+		});
+		if (result.kind === 'format-error') {
 			joinError = 'Use lowercase letters, numbers, or dashes (1–32 chars).';
+			pendingConfirmSlug = null;
 			return;
 		}
-		// Collision: another partner already claimed this slug, and our localStorage
-		// doesn't hold it (so we are not the original claimant resuming).
-		const saved =
-			typeof localStorage !== 'undefined' ? localStorage.getItem(slugStorageKey) : null;
-		const partnerSlugs = data.partnerSlugs ?? [];
-		if (partnerSlugs.includes(val) && saved !== val) {
-			joinError = `“${val}” is already taken in this session — pick another.`;
+		if (result.kind === 'needs-confirm') {
+			joinError = null;
+			pendingConfirmSlug = result.slug;
 			return;
 		}
 		joinError = null;
-		goto(`?p=${encodeURIComponent(val)}`);
+		pendingConfirmSlug = null;
+		goto(`?p=${encodeURIComponent(result.slug)}`);
+	}
+
+	function confirmRejoin() {
+		if (pendingConfirmSlug === null) return;
+		const slug = pendingConfirmSlug;
+		pendingConfirmSlug = null;
+		goto(`?p=${encodeURIComponent(slug)}`);
+	}
+
+	function cancelConfirm() {
+		pendingConfirmSlug = null;
 	}
 
 	function clearSavedSlug() {
@@ -318,15 +338,17 @@
 	}
 
 	$effect(() => {
-		// Pre-fill the join form from localStorage when no slug is in the URL.
-		// Wrap reads/writes in untrack so the effect runs once per slug-state change,
+		// Pre-fill the join form: localStorage first (per-browser-per-session),
+		// then cookieSlug from the server (survives a localStorage wipe). Wrap
+		// reads/writes in untrack so the effect runs once per slug-state change,
 		// not on every keystroke (joinInput is reactive — see svelte5_effect_loops note).
 		if (data.slug !== null) return;
-		if (typeof localStorage === 'undefined') return;
-		const saved = localStorage.getItem(slugStorageKey);
-		if (saved === null) return;
+		const saved =
+			typeof localStorage !== 'undefined' ? localStorage.getItem(slugStorageKey) : null;
+		const prefill = saved ?? data.cookieSlug ?? null;
+		if (prefill === null) return;
 		untrack(() => {
-			if (joinInput === '') joinInput = saved;
+			if (joinInput === '') joinInput = prefill;
 		});
 	});
 
@@ -545,20 +567,49 @@
 				placeholder="your-name"
 				pattern={'[a-z0-9-]{1,32}'}
 				required
+				disabled={pendingConfirmSlug !== null}
 				oninput={() => {
 					joinError = null;
+					pendingConfirmSlug = null;
 				}}
-				class="rounded-lg border border-gray-300 px-4 py-2 text-center text-lg focus:border-sage-500 focus:outline-none"
+				class="rounded-lg border border-gray-300 px-4 py-2 text-center text-lg focus:border-sage-500 focus:outline-none disabled:opacity-50"
 			/>
-			<button
-				type="submit"
-				class="rounded-lg bg-sage-600 px-6 py-2 text-white hover:bg-sage-700 active:bg-sage-800"
-			>
-				Join
-			</button>
+			{#if pendingConfirmSlug === null}
+				<button
+					type="submit"
+					class="rounded-lg bg-sage-600 px-6 py-2 text-white hover:bg-sage-700 active:bg-sage-800"
+				>
+					Join
+				</button>
+			{/if}
 		</form>
 		{#if joinError !== null}
 			<p class="text-sm text-coral-600" role="alert">{joinError}</p>
+		{/if}
+		{#if pendingConfirmSlug !== null}
+			<div class="flex max-w-sm flex-col items-center gap-3 rounded-lg border border-coral-200 bg-coral-50 p-4 text-center">
+				<p class="text-sm text-coral-800">
+					“{pendingConfirmSlug}” is already in this session. If you joined before and lost your
+					saved data, continue as <span class="font-medium">{pendingConfirmSlug}</span>.
+					Otherwise pick a different name to keep votes separate.
+				</p>
+				<div class="flex flex-wrap items-center justify-center gap-2">
+					<button
+						type="button"
+						onclick={confirmRejoin}
+						class="rounded-lg bg-sage-600 px-4 py-2 text-sm text-white hover:bg-sage-700 active:bg-sage-800"
+					>
+						Continue as {pendingConfirmSlug}
+					</button>
+					<button
+						type="button"
+						onclick={cancelConfirm}
+						class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+					>
+						Use a different name
+					</button>
+				</div>
+			</div>
 		{/if}
 		{#if (data.partnerSlugs ?? []).length === 0}
 			<p class="text-sm text-gray-400">You're the first one in.</p>
