@@ -56,6 +56,37 @@ name_meta (name, sex, peak_year, total, ...)  -- dormant; populated only if main
 
 KV continues to hold the hot deck cursor per partner.
 
+## Rate limiting
+
+Two Cloudflare WAF rate limiting rules protect the write surface. Both are configured in the Cloudflare dashboard and live outside the repo — a maintainer must apply them manually after each new zone setup.
+
+### Rules
+
+| Rule | Path | Method | Threshold | Action |
+|------|------|--------|-----------|--------|
+| vote-append | `/s/*/vote` | POST | 30 req / 1 min / IP | Block for 1 minute |
+| session-create | `/` | POST | 5 req / 1 min / IP | Block for 1 minute |
+
+### Dashboard steps
+
+1. Cloudflare dashboard → your zone → **Security** → **WAF** → **Rate limiting rules** → **Create rule**.
+2. For **vote-append**:
+   - Name: `vote-append`
+   - Expression: `(http.request.uri.path matches "^/s/[^/]+/vote$" and http.request.method eq "POST")`
+   - Characteristic: `IP`
+   - Requests: `30` per `1 minute`
+   - Action: **Block** — Duration: `1 minute`
+3. For **session-create**:
+   - Name: `session-create`
+   - Expression: `(http.request.uri.path eq "/" and http.request.method eq "POST")`
+   - Characteristic: `IP`
+   - Requests: `5` per `1 minute`
+   - Action: **Block** — Duration: `1 minute`
+
+### No app-side middleware
+
+These rules are enforced at the Cloudflare edge before the Worker runs, so no `hooks.server.ts` middleware is needed. If Bramble gains a self-host target (Phase 1.6), a lightweight in-process fallback should be evaluated at that point.
+
 ## D1 backup posture
 
 Cloudflare D1 Time Travel provides automatic point-in-time recovery for the last 7 days. That's the canonical backup. Restore via `wrangler d1 time-travel restore bramble --timestamp=<iso8601>`.

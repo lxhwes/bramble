@@ -135,11 +135,12 @@ Launch-readiness items. Disjoint files; can land in any order. All must merge be
 - First commit: `test(sessions): pruneInactiveSessions` + helper.
 - Then: `feat(sessions): scheduled session pruning`.
 
-### W3.4 — Rate limiting
+### W3.4 — Rate limiting `chore(infra): document rate-limit dashboard rules`
 
-- Cloudflare Rate Limiting rules on `POST /` (session create) and the vote-append path. Suggested: 30 req/min/IP for vote append, 5 req/min/IP for session create.
-- Configure via Cloudflare dashboard if possible; otherwise minimal middleware in `src/hooks.server.ts`.
-- Commit: `chore(infra): rate-limit session create and vote append` (only if app-side change is needed; dashboard rules don't require a commit).
+- Two Cloudflare WAF rate limiting rules: 30 req/min/IP on vote append, 5 req/min/IP on session create.
+- Dashboard-only — no app-side code needed; rules enforce at the edge before the Worker runs.
+- Full rule expressions and dashboard steps documented in `docs/ARCHITECTURE.md` § Rate limiting.
+- Status: **complete pending maintainer application of dashboard rules** (rules live outside the repo).
 
 ### W3.5 — Custom 404 / error page `93b5a1a`
 
