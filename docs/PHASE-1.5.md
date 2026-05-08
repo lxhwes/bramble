@@ -1,8 +1,8 @@
 # Phase 1.5: Public launch prep
 
-**Status:** Wave 1 shipped 2026-05-04 (W1.5 partial — see Outstanding). Wave 2 partial — W2.1 and W2.4 shipped 2026-05-04; W2.2a shipped 2026-05-05; W2.2b and W2.3 deferred. Wave 3 partial — W3.0 shipped 2026-05-05; W3.5/W3.6/W3.7 shipped 2026-05-06; W3.1–W3.4 planned, runs in parallel with W2.2b's soak window. Out-of-band: Phase 1's outstanding BTN data drop closed out 2026-05-05 with a narrower data model (related synonyms only, no origin/meaning) — see `ROADMAP.md` Phase 1 entry. Phase 1.6 self-host target slotted between Phase 1.5 close and the W1.5 repo-public flip — see `ROADMAP.md`. See `ROADMAP.md` for the phase goal and DoD; this file is the executable task list.
+**Status:** Wave 1 shipped 2026-05-04 (W1.5 partial — see Outstanding). Wave 2 partial — W2.1 and W2.4 shipped 2026-05-04; W2.2a shipped 2026-05-05; W2.2b waiting on prod soak; W2.3 dropped 2026-05-08. Wave 3 partial — W3.0 shipped 2026-05-05; W3.5/W3.6/W3.7 shipped 2026-05-06; W3.1–W3.4 planned, runs in parallel with W2.2b's soak window. Out-of-band: Phase 1's outstanding BTN data drop closed out 2026-05-05 with a narrower data model (related synonyms only, no origin/meaning) — see `ROADMAP.md` Phase 1 entry. Phase 1.6 self-host target slotted between Phase 1.5 close and the W1.5 repo-public flip — see `ROADMAP.md`. See `ROADMAP.md` for the phase goal and DoD; this file is the executable task list.
 
-Goal: foundational work that's a precondition for inviting strangers — D1 migration, magic-link auth, PWA, stats, export, shortlist mode, runner deps bump, public repo.
+Goal: foundational work that's a precondition for inviting strangers — D1 migration, PWA, stats, export, shortlist mode, runner deps bump, public repo.
 
 ## Recommended wave (parallel, ship independently)
 
@@ -91,14 +91,10 @@ Hold all of these until W1.6 has merged so `sessions.ts` stays clear of merge co
 - Commit: `feat(db): remove KV dual-write; D1 is canonical`.
 - **Held:** waiting for ~one week production soak of W2.2a.
 
-### W2.3 — Magic-link auth via Resend — deferred
+### W2.3 — Magic-link auth via Resend — dropped 2026-05-08
 
-- Depends on `users` and `sessions` tables existing in D1.
-- New: `src/routes/auth/login/+page.svelte`, `src/routes/auth/callback/+server.ts`, `src/lib/server/auth.ts`.
-- Modify: `src/hooks.server.ts` to read auth cookie and populate `event.locals.user`.
-- Anonymous sessions still work without auth; first sign-in merges the anonymous session into the user account.
-- Commit chain: `feat(auth): magic-link infrastructure`, `feat(auth): /auth/login + Resend send`, `feat(auth): /auth/callback + session merge`.
-- **Held:** needs maintainer input on Resend API key, sender domain, and email template before scaffolding can begin.
+- Removed from scope. URL-shared anonymous sessions remain the only access pattern. Without auth there is no PII collection, so the dependent privacy-policy item also drops.
+- The `users` table in `migrations/0001_init.sql` is now vestigial alongside `name_meta`. A follow-up migration may drop them if the maintainer wants the schema clean.
 
 ### W2.4 — Post-deck shortlist mode `b1ff684`
 
@@ -178,6 +174,6 @@ If a task seems implied but isn't here, stop and ask.
 
 ## Decisions deferred to maintainer
 
-- Resend vs. another magic-link provider for W2.3.
 - Whether to populate the `name_meta` D1 table or keep all name attributes in `static/names.json`. The table's `origin`/`meaning` columns (per `migrations/0001_init.sql`) are vestigial after the 2026-05-05 BTN closeout — the live attributes are now `peak_year`, `total`, and `related` (the latter not in the migration). If the maintainer ever decides to populate `name_meta`, a follow-up migration would drop `origin`/`meaning` and add `related` (likely as a JSON-encoded TEXT column).
+- Whether to drop the now-vestigial `users` table (alongside `name_meta`) in a schema cleanup migration after W2.3 was dropped 2026-05-08.
 - Final repo-public flip date — gated on W1.2 + W1.5 landing.

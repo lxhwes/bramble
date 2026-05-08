@@ -37,8 +37,7 @@ DoD met:
 Foundational work that's a precondition for inviting strangers. Originally bundled into Phase 1 in this roadmap, then explicitly deferred when the personal-tool slice took priority.
 
 - Migrate vote storage from KV to D1; KV stays for hot session state (deck cursor, etc.).
-- Schema: `users`, `sessions`, `partners`, `votes`, `name_meta`.
-- Magic-link auth via Resend or similar. Anonymous sessions still work without auth. Privacy policy ships with this — auth introduces PII, so deferring auth defers the policy.
+- Schema: `sessions`, `partners`, `votes`, `shortlists` (the originally-planned `users`/`name_meta` tables were dropped along with magic-link auth and the BTN data model narrowing).
 - Stats page: like rate, mutual likes, disagreement list.
 - PWA: manifest, service worker caches bundle and dataset, install banner.
 - Export shortlist (JSON + printable HTML).
@@ -67,7 +66,6 @@ Slotted between Phase 1.5 close and the W1.5 repo-public flip. Cloudflare Pages 
 - `src/hooks.server.ts` boot singleton populates `event.locals.kv` / `event.locals.db` on the Node target. Every server route switches from `platform.env.VOTES`/`platform.env.DB` to a single `getStorage(event)` helper that returns the same shape on either target.
 - Dockerfile (multi-stage Debian-slim base for `better-sqlite3` native build) plus `docker-compose.yml` with a SQLite volume and documented env vars. `pnpm db:migrate:local` equivalent runs at container start.
 - Node-side equivalents for Cloudflare-only Phase 1.5 features: in-process rate limiter (replaces W3.4 dashboard rules), `pnpm prune` script + host cron line (replaces W3.3 Cron Trigger), conditional Web Analytics beacon (W3.2 skipped on Node), `sqlite3 .backup` cron documented (replaces W3.7 Time Travel).
-- Magic-link auth (W2.3) ships disabled by default for self-hosters; URL-shared anonymous sessions remain the primary mode.
 - Feature matrix in `ARCHITECTURE.md` recording Cloudflare-vs-Node behaviour for every Phase 1.5+ feature. New phases must fill it in.
 - README "Self-host" section plus a `PHASE-1.6.md` executable task list when the phase becomes active.
 
