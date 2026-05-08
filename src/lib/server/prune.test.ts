@@ -66,7 +66,9 @@ interface SeedRow {
 function seed(sqlite: Database.Database, rows: SeedRow[]): void {
 	for (const { sessionId, partnerId, latestVoteTs } of rows) {
 		sqlite
-			.prepare('INSERT INTO sessions (id, user_id, created_at) VALUES (?, NULL, ?)')
+			.prepare(
+				'INSERT INTO sessions (id, user_id, created_at) VALUES (?, NULL, ?)',
+			)
 			.run(sessionId, 0);
 		sqlite
 			.prepare(
@@ -247,9 +249,9 @@ describe('pruneInactiveSessions', () => {
 
 		expect(count).toBe(3); // s-prune-1, s-prune-2, s-orphan
 
-		const remaining = sqlite
-			.prepare('SELECT id FROM sessions')
-			.all() as Array<{ id: string }>;
+		const remaining = sqlite.prepare('SELECT id FROM sessions').all() as Array<{
+			id: string;
+		}>;
 		expect(remaining.map((r) => r.id)).toEqual(['s-keep']);
 	});
 

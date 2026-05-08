@@ -58,10 +58,7 @@
 			<li>A session lives in Cloudflare KV, keyed by a random session ID.</li>
 			<li>Your swipes are tied to whichever name you picked on the join screen.</li>
 			<li>No accounts, no email, no tracking pixels, no third-party analytics.</li>
-			<li>
-				Sessions don't have a hard expiry yet, but they're not designed to stick around forever
-				either.
-			</li>
+			<li>Sessions and their votes are automatically deleted after 90 days of inactivity.</li>
 		</ul>
 	</section>
 

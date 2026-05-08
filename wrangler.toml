@@ -3,6 +3,13 @@ compatibility_date = "2026-05-03"
 compatibility_flags = ["nodejs_als"]
 pages_build_output_dir = ".svelte-kit/cloudflare"
 
+# Cron trigger for session pruning (90-day retention window).
+# On Cloudflare Pages, cron schedules must also be configured in the dashboard
+# (Settings → Functions → Cron Triggers).  This entry enables local testing via
+# `wrangler pages dev` and documents the intended schedule.
+[triggers]
+crons = ["0 4 * * *"]
+
 # KV namespace for session metadata and votes.
 # `preview_id` is used by `wrangler pages dev` for local development.
 [[kv_namespaces]]
