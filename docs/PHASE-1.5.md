@@ -1,6 +1,6 @@
 # Phase 1.5: Public launch prep
 
-**Status:** Wave 1 shipped 2026-05-04 (W1.5 partial — see Outstanding). Wave 2 partial — W2.1 and W2.4 shipped 2026-05-04; W2.2a shipped 2026-05-05; W2.2b waiting on prod soak; W2.3 dropped 2026-05-08. Wave 3 partial — W3.0 shipped 2026-05-05; W3.5/W3.6/W3.7 shipped 2026-05-06; W3.1–W3.4 planned, runs in parallel with W2.2b's soak window. Out-of-band: Phase 1's outstanding BTN data drop closed out 2026-05-05 with a narrower data model (related synonyms only, no origin/meaning) — see `ROADMAP.md` Phase 1 entry. Phase 1.6 self-host target slotted between Phase 1.5 close and the W1.5 repo-public flip — see `ROADMAP.md`. See `ROADMAP.md` for the phase goal and DoD; this file is the executable task list.
+**Status:** Wave 1 shipped 2026-05-04 (W1.5 partial — see Outstanding). Wave 2 partial — W2.1 and W2.4 shipped 2026-05-04; W2.2a shipped 2026-05-05; W2.2b waiting on prod soak; W2.3 dropped 2026-05-08. Wave 3 shipped 2026-05-08 — W3.0 shipped 2026-05-05; W3.5/W3.6/W3.7 shipped 2026-05-06; W3.1–W3.4 shipped 2026-05-08. Out-of-band: Phase 1's outstanding BTN data drop closed out 2026-05-05 with a narrower data model (related synonyms only, no origin/meaning) — see `ROADMAP.md` Phase 1 entry. Phase 1.6 self-host target slotted between Phase 1.5 close and the W1.5 repo-public flip — see `ROADMAP.md`. See `ROADMAP.md` for the phase goal and DoD; this file is the executable task list.
 
 Goal: foundational work that's a precondition for inviting strangers — D1 migration, PWA, stats, export, shortlist mode, runner deps bump, public repo.
 
@@ -114,34 +114,32 @@ Launch-readiness items. Disjoint files; can land in any order. All must merge be
 - Closes the CLAUDE.md attribution gap: SSA + Behind the Name + CC BY-SA 4.0 now render in-app, not just README.
 - Shipped 2026-05-05.
 
-### W3.1 — OpenGraph + Twitter card meta tags
+### W3.1 — OpenGraph + Twitter card meta tags `d6171ee`
 
-- Modify: `src/routes/+layout.svelte` `<svelte:head>` (or `src/app.html`) — add `og:title`, `og:description`, `og:image`, `og:url`, `twitter:card`, `twitter:image`.
-- New: `static/og.png` (1200×630) — branded coral/sage hero artwork.
-- Verify unfurl in iMessage, Slack, and Twitter/X against the deployed URL before declaring done.
-- Commit: `feat(meta): opengraph and twitter card tags`.
+- Modified `src/routes/+layout.svelte` `<svelte:head>` — added `og:title`, `og:description`, `og:image`, `og:type`, `twitter:card`, `twitter:title`, `twitter:description`, `twitter:image`. `og:url` intentionally omitted (no canonical URL at layout level; unfurlers resolve from the request URL).
+- New `static/og.png` (1200×630) solid-coral placeholder — see Outstanding.
+- Shipped 2026-05-08. Maintainer action: verify unfurl in iMessage, Slack, and Twitter/X against the deployed URL.
 
-### W3.2 — Cloudflare Web Analytics
+### W3.2 — Cloudflare Web Analytics `5625b71`
 
-- Add the Cloudflare Web Analytics beacon (free, first-party, cookie-less) to `src/routes/+layout.svelte` via `<svelte:head>`.
+- Cloudflare Web Analytics beacon (free, first-party, cookie-less) added to `src/routes/+layout.svelte` via `<svelte:head>`.
 - Beacon token injected via `PUBLIC_CF_ANALYTICS_TOKEN` (`$env/dynamic/public`). Set this in the Cloudflare Pages dashboard under Settings → Environment Variables. Script is skipped entirely when the variable is empty or absent (local dev and PR previews fire no beacons).
-- About page promises "no third-party analytics" — CF is first-party, consistent with that promise.
-- Commit: `feat(analytics): cloudflare web analytics beacon`.
+- Shipped 2026-05-08. Maintainer action: paste token into Pages dashboard env vars.
 
-### W3.3 — Session TTL / data retention
+### W3.3 — Session TTL / data retention `4159adf` `7b98793`
 
 - Retention window: **90 days since last vote** (decided 2026-05-05).
-- Implement as a Cloudflare Cron Trigger hitting a scheduled handler that deletes inactive sessions, partners, votes, and shortlist rows in one D1 transaction.
-- Update About page copy to state the 90-day retention window.
-- First commit: `test(sessions): pruneInactiveSessions` + helper.
-- Then: `feat(sessions): scheduled session pruning`.
+- `pruneInactiveSessions(db, nowMs)` in `src/lib/server/prune.ts` deletes from `votes`/`partners`/`shortlists`/`sessions` for sessions whose newest vote is older than 90 days, plus orphan sessions with zero votes.
+- Cloudflare Cron Trigger fires daily at `0 4 * * *` UTC. Scheduled handler in `src/lib/server/scheduled.ts`; injected into `_worker.js` by `scripts/patch-worker.ts` (postbuild) because `adapter-cloudflare` does not expose a scheduled-handler extension point.
+- About page copy updated to state the 90-day retention window.
+- Shipped 2026-05-08. Maintainer action: activate the cron schedule in Cloudflare dashboard under Pages → Settings → Functions → Cron Triggers (the `[triggers]` block in `wrangler.toml` is honoured by `wrangler pages dev` for local testing only).
 
-### W3.4 — Rate limiting `chore(infra): document rate-limit dashboard rules`
+### W3.4 — Rate limiting `e00a935`
 
 - Two Cloudflare WAF rate limiting rules: 30 req/min/IP on vote append, 5 req/min/IP on session create.
 - Dashboard-only — no app-side code needed; rules enforce at the edge before the Worker runs.
 - Full rule expressions and dashboard steps documented in `docs/ARCHITECTURE.md` § Rate limiting.
-- Status: **complete pending maintainer application of dashboard rules** (rules live outside the repo).
+- Shipped 2026-05-08. Maintainer action: apply the two rules in Cloudflare dashboard (Security → WAF → Rate limiting rules).
 
 ### W3.5 — Custom 404 / error page `93b5a1a`
 
