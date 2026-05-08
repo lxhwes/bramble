@@ -2,6 +2,7 @@
 	import './layout.css';
 	import Footer from '$lib/components/Footer.svelte';
 	import InstallBanner from '$lib/components/InstallBanner.svelte';
+	import { env } from '$env/dynamic/public';
 
 	let { children } = $props();
 
@@ -22,6 +23,13 @@
 	<meta name="twitter:title" content={OG_TITLE} />
 	<meta name="twitter:description" content={OG_DESCRIPTION} />
 	<meta name="twitter:image" content={OG_IMAGE} />
+	{#if env.PUBLIC_CF_ANALYTICS_TOKEN}
+		<script
+			defer
+			src="https://static.cloudflareinsights.com/beacon.min.js"
+			data-cf-beacon={`{"token": "${env.PUBLIC_CF_ANALYTICS_TOKEN}"}`}
+		></script>
+	{/if}
 </svelte:head>
 
 {@render children()}

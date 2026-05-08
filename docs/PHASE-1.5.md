@@ -123,8 +123,8 @@ Launch-readiness items. Disjoint files; can land in any order. All must merge be
 
 ### W3.2 — Cloudflare Web Analytics
 
-- Add the Cloudflare Web Analytics beacon (free, first-party, cookie-less) to `src/app.html`.
-- Beacon token comes from the Cloudflare dashboard; treat as non-secret but inject via build-time env var rather than hardcoding.
+- Add the Cloudflare Web Analytics beacon (free, first-party, cookie-less) to `src/routes/+layout.svelte` via `<svelte:head>`.
+- Beacon token injected via `PUBLIC_CF_ANALYTICS_TOKEN` (`$env/dynamic/public`). Set this in the Cloudflare Pages dashboard under Settings → Environment Variables. Script is skipped entirely when the variable is empty or absent (local dev and PR previews fire no beacons).
 - About page promises "no third-party analytics" — CF is first-party, consistent with that promise.
 - Commit: `feat(analytics): cloudflare web analytics beacon`.
 
