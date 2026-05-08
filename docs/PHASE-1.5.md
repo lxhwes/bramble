@@ -66,6 +66,7 @@ Six items below touch disjoint files and can land in any order. Plan rationale l
 - **W1.2 PWA icons.** `static/icons/icon-192.png` and `icon-512.png` are solid-coral placeholders. Replace with real branded artwork before public launch.
 - **W1.3 Favicon.** `static/favicon.svg` is a coral-on-cream "b" placeholder. Replace with the real mark once logo selection from `logo-ideas.md` is finalized.
 - **W1.1 CI verification.** The actions bump landed on `main`; first push validates the bumped runners on a real deploy.
+- **W3.1 og.png.** `static/og.png` is a solid-coral placeholder (1200×630). Replace with real branded artwork (wordmark on coral background) before launch unfurl verification.
 
 ## Wave 2 (sequenced after W1.6 lands)
 
