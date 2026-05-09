@@ -6,7 +6,7 @@ A free, open-source baby name app for couples. Swipe independently, find mutual 
 
 ## Try it
 
-[live demo coming soon]
+Live demo: [bramble.oovoid.com](https://bramble.oovoid.com)
 
 <!-- TODO: screenshot before public flip -->
 
