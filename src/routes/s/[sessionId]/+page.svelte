@@ -11,7 +11,7 @@
 		type FilterState,
 		type NameEntry,
 	} from '$lib/filters';
-	import { validateJoin } from '$lib/join-validation';
+	import { SLUG_HTML_PATTERN, validateJoin } from '$lib/join-validation';
 
 	interface PendingVote {
 		name: string;
@@ -565,7 +565,7 @@
 				type="text"
 				bind:value={joinInput}
 				placeholder="your-name"
-				pattern={'[a-z0-9-]{1,32}'}
+				pattern={SLUG_HTML_PATTERN}
 				required
 				disabled={pendingConfirmSlug !== null}
 				oninput={() => {

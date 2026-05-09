@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { validateJoin } from './join-validation.js';
+import { SLUG_HTML_PATTERN, validateJoin } from './join-validation.js';
+
+describe('SLUG_HTML_PATTERN', () => {
+	it('parses cleanly in /v regex mode (Chromium 133+ HTML pattern attr)', () => {
+		expect(() => new RegExp(SLUG_HTML_PATTERN, 'v')).not.toThrow();
+	});
+
+	it('matches valid slugs and rejects invalid ones under /v', () => {
+		const re = new RegExp(`^${SLUG_HTML_PATTERN}$`, 'v');
+		expect(re.test('alex')).toBe(true);
+		expect(re.test('alex-1')).toBe(true);
+		expect(re.test('a-b-c-d')).toBe(true);
+		expect(re.test('Alex')).toBe(false);
+		expect(re.test('alex_1')).toBe(false);
+		expect(re.test('')).toBe(false);
+	});
+});
 
 describe('validateJoin', () => {
 	it('returns format-error for empty input', () => {

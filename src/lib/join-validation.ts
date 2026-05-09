@@ -9,6 +9,12 @@
 
 const SLUG_RE = /^[a-z0-9-]{1,32}$/;
 
+// HTML5 input pattern attribute. Browsers parse this in /v regex mode (modern
+// Chromium 133+), which requires literal `-` inside a character class to be
+// escaped with `\`, regardless of position. `[a-z0-9-]` and `[-a-z0-9]` both
+// throw a /v SyntaxError. The HTML pattern attribute auto-anchors, so no `^...$`.
+export const SLUG_HTML_PATTERN = '[a-z0-9\\-]{1,32}';
+
 export interface JoinContext {
 	partnerSlugs: string[];
 	savedSlug: string | null;
