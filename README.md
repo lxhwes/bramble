@@ -8,7 +8,7 @@ A free, open-source baby name app for couples. Swipe independently, find mutual 
 
 Live demo: [bramble.oovoid.com](https://bramble.oovoid.com)
 
-<!-- TODO: screenshot before public flip -->
+![Swipe view showing the name "Calliope" on a card with no / super / yes buttons below](docs/screenshots/swipe.png)
 
 ## Why
 
