@@ -26,7 +26,7 @@ pnpm build:names  # regenerate static/names.json from data/ssa + data/btn
 
 - **Frontend**: SvelteKit + TypeScript + Tailwind
 - **Hosting**: Cloudflare Pages (uses `@sveltejs/adapter-cloudflare`, which gives us Workers for server routes)
-- **Storage**: Cloudflare KV for hot session state (deck cursor, etc.); Cloudflare D1 for vote storage (Phase 1.5 migration in progress, see `migrations/`)
+- **Storage**: Cloudflare D1 for vote storage (source of truth); Cloudflare KV for hot session state (deck cursor, slug→sessionId, etc.). Schema in `migrations/`.
 - **Lint/format**: Biome
 - **Data**: SSA national + Behind the Name (CC BY-SA), preprocessed at build time into `static/names.json`
 
@@ -37,7 +37,7 @@ This project deploys to Cloudflare. Prefer the installed Cloudflare MCP/skills o
 - Production log inspection → `mcp__plugin_cloudflare_cloudflare-observability__query_worker_observability`
 - Wrangler config/CLI changes → load `cloudflare:wrangler` skill
 - Server route / adapter-cloudflare review → load `cloudflare:workers-best-practices` skill
-- Phase 1 polish perf passes → load `cloudflare:web-perf` skill
+- Perf passes (LCP/INP/CLS, render-blocking) → load `cloudflare:web-perf` skill
 
 Full routing table: `@memory/cloudflare-platform.md`. For local dev (`pnpm dev`, `wrangler dev`), shell `wrangler` is still correct — these MCP tools target deployed accounts.
 
@@ -59,6 +59,8 @@ Full routing table: `@memory/cloudflare-platform.md`. For local dev (`pnpm dev`,
 - Server-only logic lives in `src/lib/server/`. Anything in there must never be imported by client code.
 - No new runtime dependencies without flagging in your plan first. Build-time deps are fine.
 - Vitest is wired (node env). New non-trivial logic ships with tests; trivial UI tweaks don't need them.
+- Service worker registration is skipped in dev. Test PWA flows via `pnpm build && pnpm preview`.
+- D1 tests use in-memory `better-sqlite3` as a stand-in (see `src/lib/server/db.test.ts`); no wrangler emulator needed in unit tests.
 
 ## Work tracking
 
