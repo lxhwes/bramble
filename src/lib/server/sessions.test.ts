@@ -214,7 +214,10 @@ describe('sessions.ts — KV behaviour', () => {
 
 		const result = await getMatches(env, id);
 		expect(result.matches).toHaveLength(1);
-		expect(result.matches[0]).toEqual({
+		// Match shape includes firstMatchedAt + firstLikedBy (W4.1/W4.2); the
+		// dedicated tests below cover those fields, so this assertion only
+		// pins the legacy intersection shape.
+		expect(result.matches[0]).toMatchObject({
 			name: 'Aaden',
 			sex: 'M',
 			superSlugs: [],
@@ -285,6 +288,84 @@ describe('sessions.ts — KV behaviour', () => {
 
 		const result = await getMatches(env, id);
 		expect(result.matches).toHaveLength(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Match decision aids — W4.1 firstMatchedAt + W4.2 firstLikedBy
+// ---------------------------------------------------------------------------
+
+describe('getMatches — match decision aids', () => {
+	it('firstMatchedAt is the max of yes-or-super ts across partners (the moment the match crystallizes)', async () => {
+		const { env } = kvOnly();
+		const id = await createSession(env);
+		await addPartner(env, id, 'alex');
+		await addPartner(env, id, 'laura');
+
+		// alex liked at t=100; laura liked at t=500 → match crystallizes at t=500
+		await appendVotes(env, id, 'alex', [
+			{ name: 'Aaden', sex: 'M', vote: 'yes', ts: 100 },
+		]);
+		await appendVotes(env, id, 'laura', [
+			{ name: 'Aaden', sex: 'M', vote: 'yes', ts: 500 },
+		]);
+
+		const result = await getMatches(env, id);
+		expect(result.matches[0].firstMatchedAt).toBe(500);
+	});
+
+	it('firstLikedBy is the slug of the partner with the lowest yes-or-super ts', async () => {
+		const { env } = kvOnly();
+		const id = await createSession(env);
+		await addPartner(env, id, 'alex');
+		await addPartner(env, id, 'laura');
+
+		// laura is the first liker (t=100 < t=500)
+		await appendVotes(env, id, 'alex', [
+			{ name: 'Aaden', sex: 'M', vote: 'yes', ts: 500 },
+		]);
+		await appendVotes(env, id, 'laura', [
+			{ name: 'Aaden', sex: 'M', vote: 'yes', ts: 100 },
+		]);
+
+		const result = await getMatches(env, id);
+		expect(result.matches[0].firstLikedBy).toBe('laura');
+	});
+
+	it('firstLikedBy ties break by partnerSlugs order from session meta', async () => {
+		const { env } = kvOnly();
+		const id = await createSession(env);
+		await addPartner(env, id, 'alex'); // added first → wins ties
+		await addPartner(env, id, 'laura');
+
+		// Identical timestamps → tie goes to whichever appears first in partnerSlugs
+		await appendVotes(env, id, 'alex', [
+			{ name: 'Aaden', sex: 'M', vote: 'yes', ts: 200 },
+		]);
+		await appendVotes(env, id, 'laura', [
+			{ name: 'Aaden', sex: 'M', vote: 'yes', ts: 200 },
+		]);
+
+		const result = await getMatches(env, id);
+		expect(result.matches[0].firstLikedBy).toBe('alex');
+	});
+
+	it('firstMatchedAt + firstLikedBy via D1 read path (db !== null)', async () => {
+		const { env } = kvAndDb();
+		const id = await createSession(env);
+		await addPartner(env, id, 'alex');
+		await addPartner(env, id, 'laura');
+
+		await appendVotes(env, id, 'alex', [
+			{ name: 'Mia', sex: 'F', vote: 'super', ts: 100 },
+		]);
+		await appendVotes(env, id, 'laura', [
+			{ name: 'Mia', sex: 'F', vote: 'yes', ts: 800 },
+		]);
+
+		const result = await getMatches(env, id);
+		expect(result.matches[0].firstMatchedAt).toBe(800);
+		expect(result.matches[0].firstLikedBy).toBe('alex');
 	});
 });
 

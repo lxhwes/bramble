@@ -302,7 +302,22 @@ export async function getMatches(
 	sessionId: string,
 ): Promise<{
 	partnerSlugs: string[];
-	matches: Array<{ name: string; sex: 'M' | 'F'; superSlugs: string[] }>;
+	matches: Array<{
+		name: string;
+		sex: 'M' | 'F';
+		superSlugs: string[];
+		/**
+		 * Timestamp at which every partner had voted yes/super on this name —
+		 * i.e. the moment the match crystallized. Max of the yes-or-super `ts`
+		 * across partners.
+		 */
+		firstMatchedAt: number;
+		/**
+		 * Slug of the partner whose yes-or-super on this name has the lowest
+		 * `ts`. Ties are broken by `partnerSlugs` order from session meta.
+		 */
+		firstLikedBy: string;
+	}>;
 }> {
 	const meta = await getSessionMeta(env, sessionId);
 	if (meta === null || meta.partnerSlugs.length < 2) {
@@ -317,23 +332,25 @@ export async function getMatches(
 		meta.partnerSlugs.map((slug) => getVotes(env, sessionId, slug)),
 	);
 
-	// Build a set of "name|sex" keys that each partner liked (yes or super)
-	// and a parallel set of keys that each partner specifically super-liked.
-	// A name must appear in every partner's liked set to be a match.
+	// Build per-partner indices: liked keys, super-liked keys, and a key→ts
+	// lookup for yes/super entries (needed for firstMatchedAt + firstLikedBy).
 	const likedSets = allVotes.map((pv) => {
 		const liked = new Set<string>();
 		const supered = new Set<string>();
+		const likeTs = new Map<string, number>();
 		if (pv !== null) {
 			for (const entry of pv.votes) {
+				const key = `${entry.name}|${entry.sex}`;
 				if (entry.vote === 'yes' || entry.vote === 'super') {
-					liked.add(`${entry.name}|${entry.sex}`);
+					liked.add(key);
+					likeTs.set(key, entry.ts);
 				}
 				if (entry.vote === 'super') {
-					supered.add(`${entry.name}|${entry.sex}`);
+					supered.add(key);
 				}
 			}
 		}
-		return { liked, supered };
+		return { liked, supered, likeTs };
 	});
 
 	// Intersect: start from the first set and keep only keys present in all.
@@ -348,7 +365,27 @@ export async function getMatches(
 		const superSlugs = meta.partnerSlugs.filter((_, i) =>
 			likedSets[i].supered.has(key),
 		);
-		return { name, sex: sex as 'M' | 'F', superSlugs };
+
+		// Per-partner yes/super timestamps for this match. The key is present in
+		// every partner's liked set (intersection), so likeTs.get is non-null.
+		const perPartnerTs = likedSets.map((s) => s.likeTs.get(key) as number);
+		const firstMatchedAt = Math.max(...perPartnerTs);
+
+		// First liker = partner with lowest ts. Ties resolved by partnerSlugs
+		// order (Array#indexOf returns the first match), which mirrors meta order.
+		let firstIdx = 0;
+		for (let i = 1; i < perPartnerTs.length; i++) {
+			if (perPartnerTs[i] < perPartnerTs[firstIdx]) firstIdx = i;
+		}
+		const firstLikedBy = meta.partnerSlugs[firstIdx];
+
+		return {
+			name,
+			sex: sex as 'M' | 'F',
+			superSlugs,
+			firstMatchedAt,
+			firstLikedBy,
+		};
 	});
 
 	return { partnerSlugs: meta.partnerSlugs, matches };
