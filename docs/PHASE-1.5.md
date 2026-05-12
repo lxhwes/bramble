@@ -1,6 +1,6 @@
 # Phase 1.5: Public launch prep
 
-**Status:** Wave 1 shipped 2026-05-04 (W1.5 partial — see Outstanding). Wave 2 partial — W2.1 and W2.4 shipped 2026-05-04; W2.2a shipped 2026-05-05; W2.2b waiting on prod soak; W2.3 dropped 2026-05-08. Wave 3 shipped 2026-05-08 — W3.0 shipped 2026-05-05; W3.5/W3.6/W3.7 shipped 2026-05-06; W3.1–W3.4 shipped 2026-05-08. Out-of-band: Phase 1's outstanding BTN data drop closed out 2026-05-05 with a narrower data model (related synonyms only, no origin/meaning) — see `ROADMAP.md` Phase 1 entry. Phase 1.6 self-host target slotted between Phase 1.5 close and the W1.5 repo-public flip — see `ROADMAP.md`. See `ROADMAP.md` for the phase goal and DoD; this file is the executable task list.
+**Status:** Wave 1 shipped 2026-05-04 (W1.5 partial — see Outstanding). Wave 2 partial — W2.1 and W2.4 shipped 2026-05-04; W2.2a shipped 2026-05-05; W2.2b waiting on prod soak; W2.3 dropped 2026-05-08. Wave 3 shipped 2026-05-08 — W3.0 shipped 2026-05-05; W3.5/W3.6/W3.7 shipped 2026-05-06; W3.1–W3.4 shipped 2026-05-08. Wave 4 shipped 2026-05-12. Out-of-band: Phase 1's outstanding BTN data drop closed out 2026-05-05 with a narrower data model (related synonyms only, no origin/meaning) — see `ROADMAP.md` Phase 1 entry. Phase 1.6 self-host target slotted between Phase 1.5 close and the W1.5 repo-public flip — see `ROADMAP.md`. See `ROADMAP.md` for the phase goal and DoD; this file is the executable task list.
 
 Goal: foundational work that's a precondition for inviting strangers — D1 migration, PWA, stats, export, shortlist mode, runner deps bump, public repo.
 
@@ -160,6 +160,46 @@ Launch-readiness items. Disjoint files; can land in any order. All must merge be
 - Older-than-7-day data loss is accepted (personal-tool grade; swipe votes lose meaning after a name decision).
 - Implementation: short subsection in `ARCHITECTURE.md` capturing this policy. No automation to build.
 - Shipped 2026-05-06.
+
+## Wave 4 — Match decision aids (shipped 2026-05-12)
+
+Lit up data the app was already collecting (vote timestamps, dataset metadata) to help couples actually pick a name out of their match list. All six items derived from existing D1/KV/dataset reads — no schema migration. Plan rationale lives in `~/.claude/plans/consider-the-current-state-nested-backus.md`.
+
+### W4.1 — Match recency in `getMatches` `8acf392` `606dc06`
+
+- `src/lib/server/sessions.ts` — `getMatches` now carries `firstMatchedAt: number` per match (max of yes-or-super `ts` across partners). Works under both the D1 read path and the KV fallback.
+- `src/routes/s/[sessionId]/matches/+page.svelte` — sort toggle (`Newest` / `A–Z`, default `Newest`); "✨ New" badge for matches whose `firstMatchedAt` is within the last 24h. Cutoff captured once at mount so the badge doesn't flicker.
+
+### W4.2 — First-liker attribution `8acf392` `606dc06`
+
+- `src/lib/server/sessions.ts` — `firstLikedBy: string` per match (slug of the partner with the lowest `ts` yes/super; ties broken by `partnerSlugs` order from session meta). Landed in the same server-side commit as W4.1.
+- `src/routes/s/[sessionId]/matches/+page.svelte` — soft "<slug> liked first" line under each row. Landed in the same UI commit as W4.1.
+
+### W4.3 — Lift the detail bottom-sheet into a reusable component `75d3f6b` `00c6a2f`
+
+- New: `src/lib/components/NameDetailSheet.svelte`. Lifted from the swipe page's inline `<dialog>` + drag-to-dismiss gesture. Component owns its own `/names.json` fetch at module scope so every consumer on the page shares one fetch.
+- `src/routes/s/[sessionId]/+page.svelte` — pure extraction; sheet behaviour identical to before.
+- `src/routes/s/[sessionId]/matches/+page.svelte` — tapping a row opens the sheet; an `×` on the right takes over the previous tap-to-dismiss role so both intents stay reachable.
+- `src/routes/s/[sessionId]/shortlist/+page.svelte` — tap the name cluster → opens the sheet; existing add/remove form unchanged.
+- `src/routes/s/[sessionId]/stats/+page.svelte` — tap a disagreement row → opens the sheet.
+
+### W4.4 — Shortlist export parity `03a73c0`
+
+- New: `src/routes/s/[sessionId]/shortlist/export.json/+server.ts`, `…/export.html/+server.ts`. Both reuse `buildShortlistJson` / `buildShortlistHtml`; rows come from `getShortlist` in `src/lib/server/db.ts`. `partners` field is always `[]` because shortlist rows do not carry super attribution.
+- `src/routes/s/[sessionId]/shortlist/+page.svelte` — Export JSON / Print buttons render only when the shortlist is non-empty.
+- Added one row in `src/lib/export/shortlist.test.ts` pinning the `partners:[]` invariant the endpoints depend on.
+- Matches-export filename rename (`bramble-matches.*`) deferred — current name still works and the rename can ride along with a future docs pass.
+
+### W4.5 — Agreement rate on /stats `c7a2feb` `bb319d8`
+
+- `src/lib/stats/aggregate.ts` — `StatsResult` now carries `sharedNames: number` and `agreementRate: number` (`(mutualLikes + mutualNos) / sharedNames`, 0 when no shared names). One added counter inside the existing loop.
+- `src/routes/s/[sessionId]/stats/+page.server.ts` passes both new fields down.
+- `src/routes/s/[sessionId]/stats/+page.svelte` — "<X>% agreement across <N> shared names" headline above the per-partner like-rate section.
+- New tests in `src/lib/stats/aggregate.test.ts` cover empty, full-agreement, mutual-no, and 50/50 splits.
+
+### W4.6 — Stats link on /matches header `1d1f8bf`
+
+- `src/routes/s/[sessionId]/matches/+page.svelte` — `View stats` button alongside the existing Export JSON / Print / View shortlist controls.
 
 ## Anti-tasks (NOT in Phase 1.5)
 
