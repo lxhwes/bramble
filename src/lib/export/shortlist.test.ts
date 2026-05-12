@@ -63,6 +63,17 @@ describe('buildShortlistJson', () => {
 		const b = buildShortlistJson(MATCHES, SESSION_ID, NOW);
 		expect(a).toEqual(b);
 	});
+
+	it('rows from getShortlist (no super attribution) yield partners:[] for every match', () => {
+		// Shape of getShortlist rows mapped onto MatchInput by the shortlist
+		// export endpoints in src/routes/s/[sessionId]/shortlist/export.*/+server.ts.
+		const fromShortlist = [
+			{ name: 'Aaden', sex: 'M' as const, superSlugs: [] },
+			{ name: 'Mia', sex: 'F' as const, superSlugs: [] },
+		];
+		const result = buildShortlistJson(fromShortlist, SESSION_ID, NOW);
+		expect(result.matches.every((m) => m.partners.length === 0)).toBe(true);
+	});
 });
 
 // ---------------------------------------------------------------------------
