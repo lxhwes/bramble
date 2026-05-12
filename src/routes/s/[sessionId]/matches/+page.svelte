@@ -67,6 +67,12 @@
 		>
 			View shortlist
 		</a>
+		<a
+			href="/s/{data.sessionId}/stats"
+			class="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 active:bg-slate-100"
+		>
+			View stats
+		</a>
 	</div>
 
 	{#if visible.length > 0 || data.matches.length > 0}
