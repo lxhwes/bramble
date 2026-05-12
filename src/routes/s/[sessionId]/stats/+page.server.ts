@@ -30,5 +30,7 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 		likeRate: stats.likeRate,
 		mutualLikes: stats.mutualLikes,
 		disagreements: stats.disagreements,
+		sharedNames: stats.sharedNames,
+		agreementRate: stats.agreementRate,
 	};
 };

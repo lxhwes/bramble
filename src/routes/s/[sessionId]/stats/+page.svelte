@@ -14,6 +14,15 @@
 		{data.partnerSlugs.length} partner{data.partnerSlugs.length === 1 ? '' : 's'}
 	</p>
 
+	{#if data.sharedNames > 0}
+		<section class="mt-6 rounded-lg bg-slate-50 p-4">
+			<p class="text-3xl font-bold text-emerald-600">{pct(data.agreementRate)} agreement</p>
+			<p class="mt-1 text-sm text-slate-500">
+				across {data.sharedNames} shared name{data.sharedNames === 1 ? '' : 's'}
+			</p>
+		</section>
+	{/if}
+
 	<!-- Like rates -->
 	<section class="mt-8">
 		<h2 class="text-lg font-semibold text-slate-800">Like rate</h2>
