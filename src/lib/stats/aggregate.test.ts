@@ -265,3 +265,65 @@ describe('computeStats — three partners', () => {
 		expect(result.likeRate.carol).toBe(0);
 	});
 });
+
+// ---------------------------------------------------------------------------
+// Agreement rate — W4.5
+// ---------------------------------------------------------------------------
+
+describe('computeStats — agreementRate', () => {
+	it('returns 0 when there are no shared names', () => {
+		const partners = [
+			makePartner('alice', [{ name: 'Liam', sex: 'M', vote: 'yes' }]),
+			makePartner('bob', [{ name: 'Emma', sex: 'F', vote: 'yes' }]),
+		];
+		const result = computeStats(partners);
+		expect(result.agreementRate).toBe(0);
+	});
+
+	it('returns 1 when partners agree on every shared name (all yes or all no)', () => {
+		const partners = [
+			makePartner('alice', [
+				{ name: 'Liam', sex: 'M', vote: 'yes' },
+				{ name: 'Emma', sex: 'F', vote: 'no' },
+			]),
+			makePartner('bob', [
+				{ name: 'Liam', sex: 'M', vote: 'super' },
+				{ name: 'Emma', sex: 'F', vote: 'no' },
+			]),
+		];
+		const result = computeStats(partners);
+		// Both names are shared; both agreed → 2/2 = 1.0
+		expect(result.agreementRate).toBe(1);
+	});
+
+	it('counts mutual-no agreement alongside mutual-likes', () => {
+		const partners = [
+			makePartner('alice', [
+				{ name: 'Liam', sex: 'M', vote: 'no' },
+				{ name: 'Emma', sex: 'F', vote: 'no' },
+			]),
+			makePartner('bob', [
+				{ name: 'Liam', sex: 'M', vote: 'no' },
+				{ name: 'Emma', sex: 'F', vote: 'no' },
+			]),
+		];
+		const result = computeStats(partners);
+		expect(result.agreementRate).toBe(1);
+		expect(result.mutualLikes).toBe(0);
+	});
+
+	it('returns 0.5 when half the shared names agree', () => {
+		const partners = [
+			makePartner('alice', [
+				{ name: 'Liam', sex: 'M', vote: 'yes' }, // disagree
+				{ name: 'Emma', sex: 'F', vote: 'yes' }, // agree
+			]),
+			makePartner('bob', [
+				{ name: 'Liam', sex: 'M', vote: 'no' },
+				{ name: 'Emma', sex: 'F', vote: 'super' },
+			]),
+		];
+		const result = computeStats(partners);
+		expect(result.agreementRate).toBe(0.5);
+	});
+});

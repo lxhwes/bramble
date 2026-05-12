@@ -24,6 +24,17 @@ export interface StatsResult {
 	mutualLikes: number;
 	/** Names where at least one partner liked and at least one disliked. Sorted alphabetically. */
 	disagreements: DisagreementEntry[];
+	/**
+	 * Number of names every partner has voted on. Denominator behind
+	 * `agreementRate`. 0 when no name is shared across all partners.
+	 */
+	sharedNames: number;
+	/**
+	 * (mutualLikes + mutualNos) / sharedNames — share of names every partner
+	 * voted on where they reached the same yes-vs-no verdict. 0 when
+	 * `sharedNames === 0`.
+	 */
+	agreementRate: number;
 }
 
 /**
@@ -34,7 +45,13 @@ export interface StatsResult {
  */
 export function computeStats(partners: PartnerData[]): StatsResult {
 	if (partners.length === 0) {
-		return { likeRate: {}, mutualLikes: 0, disagreements: [] };
+		return {
+			likeRate: {},
+			mutualLikes: 0,
+			disagreements: [],
+			sharedNames: 0,
+			agreementRate: 0,
+		};
 	}
 
 	// --- Like rate per partner ---
@@ -75,7 +92,13 @@ export function computeStats(partners: PartnerData[]): StatsResult {
 	// Mutual likes and disagreements require at least two partners to compare.
 	// With a single partner there is nobody to agree or disagree with.
 	if (partners.length < 2) {
-		return { likeRate, mutualLikes: 0, disagreements: [] };
+		return {
+			likeRate,
+			mutualLikes: 0,
+			disagreements: [],
+			sharedNames: 0,
+			agreementRate: 0,
+		};
 	}
 
 	// Only evaluate names seen by every partner (all partners must have a vote).
@@ -87,6 +110,7 @@ export function computeStats(partners: PartnerData[]): StatsResult {
 		.map(([key]) => key);
 
 	let mutualLikes = 0;
+	let mutualNos = 0;
 	const disagreements: DisagreementEntry[] = [];
 
 	for (const key of sharedKeys) {
@@ -112,11 +136,17 @@ export function computeStats(partners: PartnerData[]): StatsResult {
 			mutualLikes += 1;
 		} else if (anyLiked && anyDisliked) {
 			disagreements.push({ name, sex, partners: partnerVotes });
+		} else {
+			// Nobody liked → everyone voted no. Counts as agreement.
+			mutualNos += 1;
 		}
-		// If everyone voted no: skip (neither category).
 	}
 
 	disagreements.sort((a, b) => a.name.localeCompare(b.name));
 
-	return { likeRate, mutualLikes, disagreements };
+	const sharedNames = sharedKeys.length;
+	const agreementRate =
+		sharedNames === 0 ? 0 : (mutualLikes + mutualNos) / sharedNames;
+
+	return { likeRate, mutualLikes, disagreements, sharedNames, agreementRate };
 }
