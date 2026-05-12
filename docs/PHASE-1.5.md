@@ -122,9 +122,10 @@ Launch-readiness items. Disjoint files; can land in any order. All must merge be
 
 ### W3.2 — Cloudflare Web Analytics `5625b71`
 
-- Cloudflare Web Analytics beacon (free, first-party, cookie-less) added to `src/routes/+layout.svelte` via `<svelte:head>`.
-- Beacon token injected via `PUBLIC_CF_ANALYTICS_TOKEN` (`$env/dynamic/public`). Set this in the Cloudflare Pages dashboard under Settings → Environment Variables. Script is skipped entirely when the variable is empty or absent (local dev and PR previews fire no beacons).
-- Shipped 2026-05-08. Maintainer action: paste token into Pages dashboard env vars.
+- Initial implementation (2026-05-08): Cloudflare Web Analytics beacon (free, first-party, cookie-less) added to `src/routes/+layout.svelte` via `<svelte:head>`, token-gated by `PUBLIC_CF_ANALYTICS_TOKEN` (`$env/dynamic/public`).
+- Switched to auto Pages-integrated mode 2026-05-12: enabled via Cloudflare dashboard → Pages → Settings → Web Analytics. In this mode the Cloudflare edge auto-injects `static.cloudflareinsights.com/beacon.min.js` into every Pages HTML response — no app-side snippet, no env var. SPA route changes are picked up by the current `beacon.min.js`.
+- Cleanup (2026-05-12): the `PUBLIC_CF_ANALYTICS_TOKEN`-gated `<script>` block in `src/routes/+layout.svelte` (and its `$env/dynamic/public` import) was removed to make auto-injection the single source of truth and prevent any future double-counting if the env var were ever set. About page (`src/routes/about/+page.svelte`) was updated to explicitly disclose Cloudflare Web Analytics in the data-handling bullet list.
+- No maintainer action remaining.
 
 ### W3.3 — Session TTL / data retention `4159adf` `7b98793`
 

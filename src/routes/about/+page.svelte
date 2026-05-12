@@ -57,7 +57,11 @@
 		<ul class="list-disc space-y-2 pl-6 text-gray-700">
 			<li>A session lives in Cloudflare KV, keyed by a random session ID.</li>
 			<li>Your swipes are tied to whichever name you picked on the join screen.</li>
-			<li>No accounts, no email, no tracking pixels, no third-party analytics.</li>
+			<li>No accounts, no email, no tracking pixels, no cross-site advertising.</li>
+			<li>
+				Bramble uses Cloudflare Web Analytics (cookie-less, no fingerprinting) to count anonymous
+				pageviews so I can tell whether anyone is using this thing.
+			</li>
 			<li>Sessions and their votes are automatically deleted after 90 days of inactivity.</li>
 		</ul>
 	</section>
