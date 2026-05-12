@@ -1,4 +1,5 @@
 <script lang="ts">
+	import NameDetailSheet from '$lib/components/NameDetailSheet.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -6,6 +7,8 @@
 	function pct(rate: number): string {
 		return `${Math.round(rate * 100)}%`;
 	}
+
+	let detailRequest = $state<{ name: string; sex: 'M' | 'F' } | null>(null);
 </script>
 
 <main class="mx-auto max-w-md px-4 py-8">
@@ -71,7 +74,12 @@
 			<ul class="mt-3 divide-y divide-slate-100">
 				{#each data.disagreements as item (item.name + '|' + item.sex)}
 					<li class="py-3">
-						<div class="flex items-center gap-2">
+						<button
+							type="button"
+							class="flex items-center gap-2 text-left hover:opacity-75"
+							onclick={() => (detailRequest = { name: item.name, sex: item.sex })}
+							aria-label="Show details for {item.name}"
+						>
 							<span class="text-base font-semibold text-slate-900">{item.name}</span>
 							<span
 								class="rounded-full px-2 py-0.5 text-xs font-medium {item.sex === 'M'
@@ -80,7 +88,7 @@
 							>
 								{item.sex === 'M' ? 'boy' : 'girl'}
 							</span>
-						</div>
+						</button>
 						<dl class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5">
 							{#each Object.entries(item.partners) as [slug, vote] (slug)}
 								<div class="flex gap-1 text-xs">
@@ -100,4 +108,6 @@
 			</ul>
 		{/if}
 	</section>
+
+	<NameDetailSheet bind:detail={detailRequest} />
 </main>

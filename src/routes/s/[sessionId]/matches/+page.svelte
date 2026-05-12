@@ -1,7 +1,14 @@
 <script lang="ts">
+	import NameDetailSheet from '$lib/components/NameDetailSheet.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+
+	// Bound to <NameDetailSheet />. Tapping a row opens the detail sheet (the
+	// primary decision-making affordance now that the matches list is the
+	// short-list source). Dismissing a row from the visible list is a separate
+	// × control on the right.
+	let detailRequest = $state<{ name: string; sex: 'M' | 'F' } | null>(null);
 
 	// Client-side dismissed set. Key format matches getMatches: "name|sex".
 	// No server persistence — per Phase 0 spec.
@@ -109,11 +116,12 @@
 		<ul class="mt-6 divide-y divide-slate-100">
 			{#each visible as match (match.name + '|' + match.sex)}
 				{@const isNew = match.firstMatchedAt >= newCutoff}
-				<li>
+				<li class="flex items-stretch">
 					<button
 						type="button"
-						class="flex w-full flex-col items-start gap-1 px-3 py-4 text-left hover:bg-slate-50 active:bg-slate-100"
-						onclick={() => dismiss(match.name, match.sex)}
+						class="flex flex-1 flex-col items-start gap-1 px-3 py-4 text-left hover:bg-slate-50 active:bg-slate-100"
+						onclick={() => (detailRequest = { name: match.name, sex: match.sex })}
+						aria-label="Show details for {match.name}"
 					>
 						<div class="flex w-full items-center gap-3">
 							<span class="text-lg font-semibold text-slate-900">{match.name}</span>
@@ -141,14 +149,24 @@
 									✨ New
 								</span>
 							{/if}
-							<span class="ml-auto text-xs text-slate-400">tap to dismiss</span>
 						</div>
 						<span class="text-xs text-slate-500">
 							<span class="font-medium text-slate-600">{match.firstLikedBy}</span> liked first
 						</span>
 					</button>
+					<button
+						type="button"
+						class="px-3 text-slate-300 hover:bg-slate-50 hover:text-slate-500 active:bg-slate-100"
+						onclick={() => dismiss(match.name, match.sex)}
+						aria-label="Dismiss {match.name} from the visible list"
+						title="Dismiss"
+					>
+						×
+					</button>
 				</li>
 			{/each}
 		</ul>
 	{/if}
+
+	<NameDetailSheet bind:detail={detailRequest} />
 </main>

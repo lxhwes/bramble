@@ -1,8 +1,11 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import NameDetailSheet from '$lib/components/NameDetailSheet.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+
+	let detailRequest = $state<{ name: string; sex: 'M' | 'F' } | null>(null);
 
 	// Track which names are on the shortlist by key ("name|sex").
 	// Initialised from server data; kept in sync via form actions + page reload.
@@ -90,23 +93,30 @@
 				{@const key = `${match.name}|${match.sex}`}
 				{@const shortlisted = shortlistKeys.has(key)}
 				<li class="flex items-center gap-3 px-3 py-4">
-					<span class="text-lg font-semibold text-slate-900">{match.name}</span>
-					<span
-						class="rounded-full px-2 py-0.5 text-xs font-medium {match.sex === 'M'
-							? 'bg-blue-100 text-blue-700'
-							: 'bg-pink-100 text-pink-700'}"
+					<button
+						type="button"
+						class="flex flex-1 items-center gap-3 text-left hover:opacity-75"
+						onclick={() => (detailRequest = { name: match.name, sex: match.sex })}
+						aria-label="Show details for {match.name}"
 					>
-						{match.sex === 'M' ? 'boy' : 'girl'}
-					</span>
-					{#if match.superSlugs.length > 0}
+						<span class="text-lg font-semibold text-slate-900">{match.name}</span>
 						<span
-							class="text-sky-500"
-							aria-label="Super-liked by {match.superSlugs.join(', ')}"
-							title="Super-liked by {match.superSlugs.join(', ')}"
+							class="rounded-full px-2 py-0.5 text-xs font-medium {match.sex === 'M'
+								? 'bg-blue-100 text-blue-700'
+								: 'bg-pink-100 text-pink-700'}"
 						>
-							★
+							{match.sex === 'M' ? 'boy' : 'girl'}
 						</span>
-					{/if}
+						{#if match.superSlugs.length > 0}
+							<span
+								class="text-sky-500"
+								aria-label="Super-liked by {match.superSlugs.join(', ')}"
+								title="Super-liked by {match.superSlugs.join(', ')}"
+							>
+								★
+							</span>
+						{/if}
+					</button>
 					<form
 						method="POST"
 						action="?/{shortlisted ? 'remove' : 'add'}"
@@ -131,4 +141,6 @@
 			{/each}
 		</ul>
 	{/if}
+
+	<NameDetailSheet bind:detail={detailRequest} />
 </main>
