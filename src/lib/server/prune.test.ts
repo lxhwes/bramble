@@ -278,4 +278,29 @@ describe('pruneInactiveSessions', () => {
 		const count = await pruneInactiveSessions(db, now);
 		expect(count).toBe(2);
 	});
+
+	it('respects an explicit retentionMs override', async () => {
+		const sqlite = openWithAllMigrations();
+		const db = makeD1Shim(sqlite);
+		const now = Date.now();
+		// Use a 1-day retention window.
+		const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+		// Session whose last vote is 2 days old — stale under 1-day retention.
+		seed(sqlite, [
+			{
+				sessionId: 's-1day-old',
+				partnerId: 'p-1day-old',
+				latestVoteTs: now - ONE_DAY_MS * 2,
+			},
+		]);
+
+		// Default 90-day window: session is kept.
+		const countDefault = await pruneInactiveSessions(db, now);
+		expect(countDefault).toBe(0);
+
+		// Explicit 1-day window: session is pruned.
+		const countShort = await pruneInactiveSessions(db, now, ONE_DAY_MS);
+		expect(countShort).toBe(1);
+	});
 });
