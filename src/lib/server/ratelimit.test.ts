@@ -6,8 +6,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { checkRateLimit } from './ratelimit.js';
 import type { RateLimitState } from './ratelimit.js';
+import { checkRateLimit } from './ratelimit.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
