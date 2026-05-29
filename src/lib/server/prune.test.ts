@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import { pruneInactiveSessions } from './prune.js';
+import type { BrambleDB } from './storage/types.js';
 
 // ---------------------------------------------------------------------------
 // Schema fixture
@@ -26,7 +27,7 @@ function openWithAllMigrations(): Database.Database {
 
 type D1Row = Record<string, unknown>;
 
-function makeD1Shim(sqlite: Database.Database): D1Database {
+function makeD1Shim(sqlite: Database.Database): BrambleDB {
 	return {
 		prepare(query: string) {
 			let bound: unknown[] = [];
@@ -50,7 +51,7 @@ function makeD1Shim(sqlite: Database.Database): D1Database {
 			};
 			return stmt;
 		},
-	} as unknown as D1Database;
+	};
 }
 
 // ---------------------------------------------------------------------------

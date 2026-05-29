@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import { addToShortlist, getShortlist, removeFromShortlist } from './db';
+import type { BrambleDB } from './storage/types.js';
 
 // ---------------------------------------------------------------------------
 // Schema fixture
@@ -44,29 +45,18 @@ function openWithAllMigrations(): Database.Database {
 // ---------------------------------------------------------------------------
 // D1 shim
 //
-// Wraps a better-sqlite3 Database in an async interface compatible with D1Database.
+// Wraps a better-sqlite3 Database as BrambleDB.
 // Used only in tests — never imported by production code.
 // ---------------------------------------------------------------------------
 
 type D1Row = Record<string, unknown>;
 
-interface ShimStatement {
-	bind(...values: unknown[]): ShimStatement;
-	all<T = D1Row>(): Promise<{ results: T[] }>;
-	run(): Promise<{ meta: { changes: number } }>;
-	first<T = D1Row>(): Promise<T | null>;
-}
-
-interface ShimDatabase {
-	prepare(query: string): ShimStatement;
-}
-
-function makeD1Shim(sqlite: Database.Database): ShimDatabase {
+function makeD1Shim(sqlite: Database.Database): BrambleDB {
 	return {
-		prepare(query: string): ShimStatement {
+		prepare(query: string) {
 			let boundValues: unknown[] = [];
-			const stmt: ShimStatement = {
-				bind(...values: unknown[]): ShimStatement {
+			const stmt = {
+				bind(...values: unknown[]) {
 					boundValues = values;
 					return stmt;
 				},
@@ -306,20 +296,20 @@ describe('migrations/0002_shortlist.sql', () => {
 // ---------------------------------------------------------------------------
 
 describe('shortlist helpers', () => {
-	function makeDb(): ShimDatabase {
+	function makeDb(): BrambleDB {
 		return makeD1Shim(openWithAllMigrations());
 	}
 
 	it('getShortlist returns empty array for a new session', async () => {
 		const db = makeDb();
-		const result = await getShortlist(db as unknown as D1Database, 'sess-new');
+		const result = await getShortlist(db, 'sess-new');
 		expect(result).toEqual([]);
 	});
 
 	it('addToShortlist inserts a row and getShortlist returns it', async () => {
 		const db = makeDb();
-		await addToShortlist(db as unknown as D1Database, 'sess1', 'Ava', 'F');
-		const result = await getShortlist(db as unknown as D1Database, 'sess1');
+		await addToShortlist(db, 'sess1', 'Ava', 'F');
+		const result = await getShortlist(db, 'sess1');
 		expect(result).toHaveLength(1);
 		expect(result[0].name).toBe('Ava');
 		expect(result[0].sex).toBe('F');
@@ -328,25 +318,25 @@ describe('shortlist helpers', () => {
 
 	it('addToShortlist is idempotent (INSERT OR IGNORE)', async () => {
 		const db = makeDb();
-		await addToShortlist(db as unknown as D1Database, 'sess1', 'Ava', 'F');
-		await addToShortlist(db as unknown as D1Database, 'sess1', 'Ava', 'F');
-		const result = await getShortlist(db as unknown as D1Database, 'sess1');
+		await addToShortlist(db, 'sess1', 'Ava', 'F');
+		await addToShortlist(db, 'sess1', 'Ava', 'F');
+		const result = await getShortlist(db, 'sess1');
 		expect(result).toHaveLength(1);
 	});
 
 	it('addToShortlist distinguishes sex (M vs F)', async () => {
 		const db = makeDb();
-		await addToShortlist(db as unknown as D1Database, 'sess1', 'Avery', 'F');
-		await addToShortlist(db as unknown as D1Database, 'sess1', 'Avery', 'M');
-		const result = await getShortlist(db as unknown as D1Database, 'sess1');
+		await addToShortlist(db, 'sess1', 'Avery', 'F');
+		await addToShortlist(db, 'sess1', 'Avery', 'M');
+		const result = await getShortlist(db, 'sess1');
 		expect(result).toHaveLength(2);
 	});
 
 	it('removeFromShortlist deletes the row', async () => {
 		const db = makeDb();
-		await addToShortlist(db as unknown as D1Database, 'sess1', 'Ava', 'F');
-		await removeFromShortlist(db as unknown as D1Database, 'sess1', 'Ava', 'F');
-		const result = await getShortlist(db as unknown as D1Database, 'sess1');
+		await addToShortlist(db, 'sess1', 'Ava', 'F');
+		await removeFromShortlist(db, 'sess1', 'Ava', 'F');
+		const result = await getShortlist(db, 'sess1');
 		expect(result).toEqual([]);
 	});
 
@@ -354,41 +344,35 @@ describe('shortlist helpers', () => {
 		const db = makeDb();
 		// Should not throw.
 		await expect(
-			removeFromShortlist(db as unknown as D1Database, 'sess1', 'Ghost', 'M'),
+			removeFromShortlist(db, 'sess1', 'Ghost', 'M'),
 		).resolves.toBeUndefined();
 	});
 
 	it('round-trip: add → get → remove → get empty', async () => {
 		const db = makeDb();
-		await addToShortlist(db as unknown as D1Database, 'sess1', 'Ava', 'F');
-		await addToShortlist(db as unknown as D1Database, 'sess1', 'Leo', 'M');
+		await addToShortlist(db, 'sess1', 'Ava', 'F');
+		await addToShortlist(db, 'sess1', 'Leo', 'M');
 
-		const after_add = await getShortlist(db as unknown as D1Database, 'sess1');
+		const after_add = await getShortlist(db, 'sess1');
 		expect(after_add).toHaveLength(2);
 
-		await removeFromShortlist(db as unknown as D1Database, 'sess1', 'Ava', 'F');
-		const after_remove = await getShortlist(
-			db as unknown as D1Database,
-			'sess1',
-		);
+		await removeFromShortlist(db, 'sess1', 'Ava', 'F');
+		const after_remove = await getShortlist(db, 'sess1');
 		expect(after_remove).toHaveLength(1);
 		expect(after_remove[0].name).toBe('Leo');
 
-		await removeFromShortlist(db as unknown as D1Database, 'sess1', 'Leo', 'M');
-		const after_empty = await getShortlist(
-			db as unknown as D1Database,
-			'sess1',
-		);
+		await removeFromShortlist(db, 'sess1', 'Leo', 'M');
+		const after_empty = await getShortlist(db, 'sess1');
 		expect(after_empty).toEqual([]);
 	});
 
 	it('getShortlist is scoped to the session (does not cross-contaminate)', async () => {
 		const db = makeDb();
-		await addToShortlist(db as unknown as D1Database, 'sess1', 'Ava', 'F');
-		await addToShortlist(db as unknown as D1Database, 'sess2', 'Leo', 'M');
+		await addToShortlist(db, 'sess1', 'Ava', 'F');
+		await addToShortlist(db, 'sess2', 'Leo', 'M');
 
-		const sess1 = await getShortlist(db as unknown as D1Database, 'sess1');
-		const sess2 = await getShortlist(db as unknown as D1Database, 'sess2');
+		const sess1 = await getShortlist(db, 'sess1');
+		const sess2 = await getShortlist(db, 'sess2');
 
 		expect(sess1.map((r) => r.name)).toEqual(['Ava']);
 		expect(sess2.map((r) => r.name)).toEqual(['Leo']);

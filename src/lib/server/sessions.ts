@@ -25,6 +25,8 @@
  * swallowed.  A D1 failure must not break the swipe path.
  */
 
+import type { BrambleDB, BrambleKV } from './storage/types.js';
+
 export type Vote = 'yes' | 'no' | 'super';
 
 export interface VoteEntry {
@@ -53,8 +55,8 @@ export interface PartnerVotes {
  * `null` safely.
  */
 export interface SessionEnv {
-	kv: KVNamespace;
-	db: D1Database | null;
+	kv: BrambleKV;
+	db: BrambleDB | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -168,7 +170,7 @@ export async function addPartner(
 }
 
 async function insertPartnerD1(
-	db: D1Database,
+	db: BrambleDB,
 	sessionId: string,
 	slug: string,
 ): Promise<void> {

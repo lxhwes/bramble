@@ -9,6 +9,8 @@
  * call it with only the D1 binding and a clock value.
  */
 
+import type { BrambleDB } from './storage/types.js';
+
 const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 
 /**
@@ -24,7 +26,7 @@ const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
  * Returns the number of sessions deleted.
  */
 export async function pruneInactiveSessions(
-	db: D1Database,
+	db: BrambleDB,
 	nowMs: number,
 ): Promise<number> {
 	const cutoff = nowMs - RETENTION_MS;
