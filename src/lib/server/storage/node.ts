@@ -16,7 +16,12 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import Database from 'better-sqlite3';
 import { runMigrations } from './migrate.js';
-import type { BrambleDB, BrambleKV, BrambleStatement, Storage } from './types.js';
+import type {
+	BrambleDB,
+	BrambleKV,
+	BrambleStatement,
+	Storage,
+} from './types.js';
 
 // ---------------------------------------------------------------------------
 // BrambleDB — wraps better-sqlite3

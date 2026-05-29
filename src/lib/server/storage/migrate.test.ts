@@ -50,16 +50,16 @@ describe('runMigrations', () => {
 		const sqlite = new Database(':memory:');
 		runMigrations(sqlite, MIGRATIONS_DIR);
 		const countBefore = (
-			sqlite
-				.prepare('SELECT COUNT(*) as n FROM _migrations')
-				.get() as { n: number }
+			sqlite.prepare('SELECT COUNT(*) as n FROM _migrations').get() as {
+				n: number;
+			}
 		).n;
 
 		runMigrations(sqlite, MIGRATIONS_DIR);
 		const countAfter = (
-			sqlite
-				.prepare('SELECT COUNT(*) as n FROM _migrations')
-				.get() as { n: number }
+			sqlite.prepare('SELECT COUNT(*) as n FROM _migrations').get() as {
+				n: number;
+			}
 		).n;
 
 		expect(countAfter).toBe(countBefore);

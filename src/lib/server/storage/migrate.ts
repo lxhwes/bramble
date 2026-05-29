@@ -16,7 +16,10 @@ import type Database from 'better-sqlite3';
  * first run. Migrations are applied in filename sort order; already-applied
  * filenames are skipped.
  */
-export function runMigrations(sqlite: Database.Database, migrationsDir: string): void {
+export function runMigrations(
+	sqlite: Database.Database,
+	migrationsDir: string,
+): void {
 	sqlite.exec(`
 		CREATE TABLE IF NOT EXISTS _migrations (
 			name       TEXT    PRIMARY KEY,
@@ -25,9 +28,11 @@ export function runMigrations(sqlite: Database.Database, migrationsDir: string):
 	`);
 
 	const applied = new Set(
-		(sqlite.prepare('SELECT name FROM _migrations').all() as Array<{ name: string }>).map(
-			(r) => r.name,
-		),
+		(
+			sqlite.prepare('SELECT name FROM _migrations').all() as Array<{
+				name: string;
+			}>
+		).map((r) => r.name),
 	);
 
 	const files = readdirSync(migrationsDir)

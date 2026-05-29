@@ -3,7 +3,6 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import type { SessionEnv, VoteEntry } from './sessions.js';
-import type { BrambleDB, BrambleKV } from './storage/types.js';
 import {
 	addPartner,
 	appendVotes,
@@ -11,6 +10,7 @@ import {
 	getMatches,
 	getVotes,
 } from './sessions.js';
+import type { BrambleDB, BrambleKV } from './storage/types.js';
 
 // ---------------------------------------------------------------------------
 // In-memory KV mock

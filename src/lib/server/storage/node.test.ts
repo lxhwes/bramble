@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
+import { pruneInactiveSessions } from '../prune.js';
 import {
 	addPartner,
 	appendVotes,
@@ -8,7 +9,6 @@ import {
 	getMatches,
 	getVotes,
 } from '../sessions.js';
-import { pruneInactiveSessions } from '../prune.js';
 import { runMigrations } from './migrate.js';
 import { makeSqliteAdapter, makeSqliteKV } from './node.js';
 import type { Storage } from './types.js';
@@ -118,7 +118,11 @@ describe('makeSqliteAdapter + sessions.ts — end-to-end', () => {
 		const pv = await getVotes(storage, id, 'alex');
 		expect(pv).not.toBeNull();
 		expect(pv?.votes).toHaveLength(1);
-		expect(pv?.votes[0]).toMatchObject({ name: 'Ava', sex: 'F', vote: 'super' });
+		expect(pv?.votes[0]).toMatchObject({
+			name: 'Ava',
+			sex: 'F',
+			vote: 'super',
+		});
 	});
 });
 
