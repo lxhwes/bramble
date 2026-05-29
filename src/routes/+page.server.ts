@@ -1,5 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import { createSession } from '$lib/server/sessions';
+import { getStorage } from '$lib/server/storage';
 import {
 	LEGACY_COOKIE,
 	parseSessionsCookie,
@@ -23,13 +24,8 @@ export const load: PageServerLoad = async ({ cookies }) => {
 
 export const actions: Actions = {
 	default: async ({ platform, cookies }) => {
-		if (!platform) {
-			throw new Error('platform is not available');
-		}
-		const id = await createSession({
-			kv: platform.env.VOTES,
-			db: platform.env.DB,
-		});
+		const env = await getStorage(platform);
+		const id = await createSession(env);
 		// Upsert into the multi-session cookie so this id is the most recent.
 		const entries = parseSessionsCookie(cookies.get(SESSIONS_COOKIE));
 		const next = upsertSession(entries, id, null, Date.now());
