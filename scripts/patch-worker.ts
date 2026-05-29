@@ -15,8 +15,17 @@
  * Usage: called automatically via the `postbuild` npm script.
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+
+// No-op for Node builds: there is no _worker.js to patch.
+if (
+	process.env.BRAMBLE_TARGET === 'node' ||
+	!existsSync(join(import.meta.dirname, '../.svelte-kit/cloudflare/_worker.js'))
+) {
+	console.log('[patch-worker] skipping — not a Cloudflare build');
+	process.exit(0);
+}
 
 const WORKER_PATH = join(
 	import.meta.dirname,

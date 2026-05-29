@@ -127,7 +127,12 @@ export function getNodeStorage(): Storage {
 	sqlite.pragma('journal_mode = WAL');
 	sqlite.pragma('foreign_keys = ON');
 
-	const migrationsDir = join(import.meta.dirname, '../../../../migrations');
+	// Resolve migrations relative to cwd so this works both in dev (where
+	// import.meta.dirname is inside src/) and in the built/containerised server
+	// (where the file has moved). An env override lets operators point at a
+	// custom location without rebuilding.
+	const migrationsDir =
+		process.env.BRAMBLE_MIGRATIONS_DIR ?? join(process.cwd(), 'migrations');
 	runMigrations(sqlite, migrationsDir);
 
 	_nodeStorage = {
