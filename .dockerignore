@@ -1,0 +1,32 @@
+# Dependencies and build outputs — rebuilt inside Docker
+node_modules
+.svelte-kit
+build
+
+# Version control
+.git
+.gitignore
+
+# Local Cloudflare / Wrangler state
+.wrangler
+
+# Local data directory (SQLite file; provided via volume at runtime)
+data
+
+# Local env files (runtime config is passed via docker-compose environment)
+.env
+.env.*
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Claude Code per-developer config
+.claude
+
+# Playwright CLI artifacts
+.playwright-cli
+
+# Test and CI artifacts
+coverage
+*.log
