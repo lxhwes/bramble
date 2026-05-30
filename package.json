@@ -1,7 +1,21 @@
 {
 	"name": "bramble",
-	"private": true,
 	"version": "0.0.1",
+	"description": "Open-source baby-name swipe app for couples — swipe independently, find mutual matches.",
+	"license": "MIT",
+	"author": "Alex Howes",
+	"homepage": "https://bramble.oovoid.com",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/ahowes/bramble.git"
+	},
+	"bugs": {
+		"url": "https://github.com/ahowes/bramble/issues"
+	},
+	"engines": {
+		"node": ">=22",
+		"pnpm": ">=10"
+	},
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
