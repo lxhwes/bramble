@@ -7,10 +7,10 @@
 	"homepage": "https://bramble.oovoid.com",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/ahowes/bramble.git"
+		"url": "git+https://github.com/lxhwes/bramble.git"
 	},
 	"bugs": {
-		"url": "https://github.com/ahowes/bramble/issues"
+		"url": "https://github.com/lxhwes/bramble/issues"
 	},
 	"engines": {
 		"node": ">=22",

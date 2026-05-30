@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Report security issues privately by opening a [GitHub security advisory](https://github.com/ahowes/bramble/security/advisories/new), or email the maintainer at `security@example.com` _(maintainer: replace with a real contact before public launch)_.
+Report security issues privately by opening a [GitHub security advisory](https://github.com/lxhwes/bramble/security/advisories/new), or email the maintainer at `4140142+lxhwes@users.noreply.github.com`.
 
 Please do not open a public issue for a security report. There is no bug bounty.
 
