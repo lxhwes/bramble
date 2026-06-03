@@ -27,7 +27,7 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"gen": "wrangler types",
 		"build:cf": "wrangler types --check && vite build",
-		"build:node": "BRAMBLE_TARGET=node vite build",
+		"build:node": "BRAMBLE_TARGET=node vite build && tsx scripts/bundle-prune.ts",
 		"start:node": "node build/index.js",
 		"prune": "BRAMBLE_TARGET=node tsx scripts/prune-cli.ts",
 		"build:names": "tsx scripts/build-names.ts",

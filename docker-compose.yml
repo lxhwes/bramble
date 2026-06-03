@@ -4,11 +4,9 @@
 #   docker compose up -d
 #
 # Daily data-retention prune (add to host crontab):
-#   0 3 * * * docker compose -f /path/to/docker-compose.yml exec -T app node build/index.js prune
-#   (or via the prune script: docker compose exec app node -e "require('./scripts/prune-cli')")
-#   Simpler: docker compose exec -T app sh -c 'BRAMBLE_RETENTION_DAYS=${BRAMBLE_RETENTION_DAYS:-90} node build/index.js' 2>&1
-#   Recommended cron using pnpm prune script:
-#   0 3 * * * cd /path/to/bramble && docker compose exec -T app pnpm prune
+#   0 3 * * * docker compose -f /path/to/docker-compose.yml exec -T app node build/prune.js
+#
+# Retention window is controlled by BRAMBLE_RETENTION_DAYS (default 90 days).
 #
 # SQLite backup (run from host, safe with WAL mode):
 #   docker compose exec app sqlite3 "$BRAMBLE_DB_PATH" ".backup '/data/backup-$(date +%F).sqlite'"
