@@ -21,6 +21,12 @@ interface WindowEntry {
  * Mutable state map keyed by an arbitrary string (typically "ip:rule").
  * Export as an opaque type so callers can create instances for testing without
  * touching the module singleton.
+ *
+ * Memory growth note: entries are evicted lazily — only when the same key is
+ * accessed again after its window expires. An IP-rotating client that never
+ * repeats a key will grow this Map without bound. At personal-tool scale
+ * (single server, known user set) this is acceptable; no background sweeper
+ * is implemented by design.
  */
 export type RateLimitState = Map<string, WindowEntry>;
 

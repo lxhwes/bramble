@@ -48,6 +48,11 @@ const RULES: RuleConfig[] = [
 ];
 
 // Module-level state: one Map, shared across all requests in this process.
+//
+// Memory growth note: entries evict lazily — only when the same (ip:rule) key
+// is accessed after its window expires. An IP-rotating client that never
+// repeats a key grows this Map without bound. At personal-tool scale this is
+// acceptable; no background sweeper is implemented by design.
 const rateLimitState: RateLimitState = new Map();
 
 // ---------------------------------------------------------------------------
@@ -62,6 +67,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	const { method } = event.request;
 	const { pathname } = new URL(event.request.url);
+
+	// Proxy footgun: without ADDRESS_HEADER or XFF_DEPTH configured,
+	// getClientAddress() returns the reverse-proxy IP, collapsing every
+	// downstream client into a single bucket (e.g. 5 session-creates/min
+	// for the entire site). Configure ADDRESS_HEADER / XFF_DEPTH in the
+	// environment — see .env.example and docker-compose.yml proxy settings.
 	const ip = event.getClientAddress();
 
 	for (const rule of RULES) {
