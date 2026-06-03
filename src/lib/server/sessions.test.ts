@@ -10,20 +10,17 @@ import {
 	getMatches,
 	getVotes,
 } from './sessions.js';
+import type { BrambleDB, BrambleKV } from './storage/types.js';
 
 // ---------------------------------------------------------------------------
 // In-memory KV mock
 // ---------------------------------------------------------------------------
 
 /**
- * Minimal in-memory store that covers only the KVNamespace methods sessions.ts
- * uses: `get(key, 'json')` and `put(key, stringValue)`.
- *
- * Typed as a plain object to avoid having to mirror the complex overload set on
- * the KVNamespace interface. Cast to `KVNamespace` at call sites via
- * `mockKv()` helper below.
+ * Minimal in-memory store that satisfies BrambleKV:
+ * `get(key, 'json')`, `put(key, stringValue)`, `delete(key)`.
  */
-class MockKV {
+class MockKV implements BrambleKV {
 	private store = new Map<string, string>();
 
 	get<T = unknown>(key: string, _type: 'json'): Promise<T | null> {
@@ -36,12 +33,17 @@ class MockKV {
 		this.store.set(key, value);
 		return Promise.resolve();
 	}
+
+	delete(key: string): Promise<void> {
+		this.store.delete(key);
+		return Promise.resolve();
+	}
 }
 
-/** Cast a MockKV to the KVNamespace shape expected by sessions.ts. */
-function mockKv(): { kv: KVNamespace; raw: MockKV } {
+/** Returns a MockKV typed as BrambleKV. */
+function mockKv(): { kv: BrambleKV; raw: MockKV } {
 	const raw = new MockKV();
-	return { kv: raw as unknown as KVNamespace, raw };
+	return { kv: raw, raw };
 }
 
 // ---------------------------------------------------------------------------
@@ -50,12 +52,9 @@ function mockKv(): { kv: KVNamespace; raw: MockKV } {
 
 /**
  * Opens a fresh in-memory SQLite database with the Bramble schema applied.
- * Returns a D1Database-compatible mock that wraps better-sqlite3.
- *
- * Only covers `prepare(sql).run(...bindings)` and `prepare(sql).first()` —
- * the only D1 methods sessions.ts uses for dual-write.
+ * Returns a BrambleDB wrapping better-sqlite3.
  */
-function openMockDb(): { db: D1Database; raw: Database.Database } {
+function openMockDb(): { db: BrambleDB; raw: Database.Database } {
 	const migrationPath = join(
 		import.meta.dirname,
 		'../../../migrations/0001_init.sql',
@@ -64,35 +63,30 @@ function openMockDb(): { db: D1Database; raw: Database.Database } {
 	const raw = new Database(':memory:');
 	raw.exec(sql);
 
-	// Wrap better-sqlite3 to look like D1Database's prepare().run() / .first() API.
-	const db = {
+	const db: BrambleDB = {
 		prepare(query: string) {
-			return {
+			let boundValues: unknown[] = [];
+			const stmt = {
 				bind(...values: unknown[]) {
-					return {
-						run() {
-							return Promise.resolve(raw.prepare(query).run(...values));
-						},
-						first<T = unknown>(): Promise<T | null> {
-							const row = raw.prepare(query).get(...values) as T | undefined;
-							return Promise.resolve(row ?? null);
-						},
-						all<T = unknown>(): Promise<{ results: T[] }> {
-							const rows = raw.prepare(query).all(...values) as T[];
-							return Promise.resolve({ results: rows });
-						},
-					};
+					boundValues = values;
+					return stmt;
 				},
-				run(...values: unknown[]) {
-					return Promise.resolve(raw.prepare(query).run(...values));
+				async run() {
+					const info = raw.prepare(query).run(...boundValues);
+					return { meta: { changes: info.changes } };
 				},
-				first<T = unknown>(...values: unknown[]): Promise<T | null> {
-					const row = raw.prepare(query).get(...values) as T | undefined;
-					return Promise.resolve(row ?? null);
+				async first<T = unknown>(): Promise<T | null> {
+					const row = raw.prepare(query).get(...boundValues) as T | undefined;
+					return row ?? null;
+				},
+				async all<T = unknown>(): Promise<{ results: T[] }> {
+					const rows = raw.prepare(query).all(...boundValues) as T[];
+					return { results: rows };
 				},
 			};
+			return stmt;
 		},
-	} as unknown as D1Database;
+	};
 
 	return { db, raw };
 }
@@ -109,13 +103,13 @@ function makeVote(
 	return { name, sex, vote, ts: Date.now() };
 }
 
-/** Build a SessionEnv without D1 — for the existing KV-only tests. */
+/** Build a SessionEnv without a DB — for the existing KV-only tests. */
 function kvOnly(): { env: SessionEnv; rawKv: MockKV } {
 	const { kv, raw } = mockKv();
 	return { env: { kv, db: null }, rawKv: raw };
 }
 
-/** Build a SessionEnv with both KV and D1 — for parity tests. */
+/** Build a SessionEnv with both KV and a BrambleDB — for parity tests. */
 function kvAndDb(): {
 	env: SessionEnv;
 	rawKv: MockKV;
@@ -543,19 +537,20 @@ describe('sessions.ts — D1 dual-write parity', () => {
 	});
 
 	it('D1 write failure is best-effort — does not propagate to caller', async () => {
-		// Simulate a broken D1 by passing an object whose prepare().bind().run() rejects.
-		const brokenDb = {
+		// Simulate a broken DB by passing an object whose prepare().bind().run() rejects.
+		const brokenDb: BrambleDB = {
 			prepare() {
-				return {
+				const stmt = {
 					bind() {
-						return {
-							run: () => Promise.reject(new Error('D1 unavailable')),
-							first: () => Promise.reject(new Error('D1 unavailable')),
-						};
+						return stmt;
 					},
+					run: () => Promise.reject(new Error('DB unavailable')),
+					first: () => Promise.reject(new Error('DB unavailable')),
+					all: () => Promise.reject(new Error('DB unavailable')),
 				};
+				return stmt;
 			},
-		} as unknown as D1Database;
+		};
 
 		const { kv } = mockKv();
 		const env: SessionEnv = { kv, db: brokenDb };

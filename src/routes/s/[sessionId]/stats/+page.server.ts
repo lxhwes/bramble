@@ -1,12 +1,11 @@
 import { error } from '@sveltejs/kit';
 import { getSessionMeta, getVotes } from '$lib/server/sessions.js';
+import { getStorage } from '$lib/server/storage/index.js';
 import { computeStats } from '$lib/stats/aggregate.js';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, platform }) => {
-	if (!platform) throw error(500, 'Platform not available');
-
-	const env = { kv: platform.env.VOTES, db: platform.env.DB };
+	const env = await getStorage(platform);
 	const { sessionId } = params;
 
 	const meta = await getSessionMeta(env, sessionId);

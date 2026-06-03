@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { addPartner, getSessionMeta, getVotes } from '$lib/server/sessions';
+import { getStorage } from '$lib/server/storage';
 import {
 	LEGACY_COOKIE,
 	parseSessionsCookie,
@@ -22,11 +23,7 @@ export const load: PageServerLoad = async ({
 	const slug = raw !== null ? raw.toLowerCase() : null;
 	const slugValid = slug !== null && SLUG_RE.test(slug);
 
-	if (!platform) {
-		throw error(500, 'Platform not available');
-	}
-
-	const env = { kv: platform.env.VOTES, db: platform.env.DB };
+	const env = await getStorage(platform);
 	const meta = await getSessionMeta(env, params.sessionId);
 
 	if (meta === null) {

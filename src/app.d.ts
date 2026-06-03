@@ -14,6 +14,9 @@ declare global {
 		// interface PageData {}
 		// interface PageState {}
 	}
+
+	/** Build-time constant injected by Vite. 'cloudflare' | 'node'. */
+	const __BRAMBLE_TARGET__: string;
 }
 
 export {};

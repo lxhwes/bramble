@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.18.3
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
+
+      - run: pnpm check
+
+      - run: pnpm test
+
+      - run: pnpm build:cf
+
+      - name: Guard - better-sqlite3 absent from CF bundle
+        run: |
+          if grep -r "better-sqlite3" .svelte-kit/cloudflare/; then
+            echo "FAIL: better-sqlite3 found in CF Worker bundle."
+            echo "A static import of storage/node.ts (or a similar Node-only module) likely"
+            echo "bypassed the __BRAMBLE_TARGET__ dead-code-elimination guard."
+            echo "Fix: ensure all better-sqlite3 imports are gated behind the runtime check"
+            echo "so Rollup can eliminate them from the Cloudflare bundle."
+            exit 1
+          fi
+          echo "OK: better-sqlite3 is not present in the CF Worker bundle."
+
+      - run: pnpm build:node

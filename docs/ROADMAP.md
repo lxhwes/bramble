@@ -39,6 +39,7 @@ Foundational work that's a precondition for inviting strangers. Originally bundl
 - Migrate vote storage from KV to D1; KV stays for hot session state (deck cursor, etc.).
 - Schema: `sessions`, `partners`, `votes`, `shortlists` (the originally-planned `users`/`name_meta` tables were dropped along with magic-link auth and the BTN data model narrowing).
 - Stats page: like rate, mutual likes, disagreement list.
+- Match decision aids: recency sort + "new" badges, first-liker attribution, detail-sheet reuse on matches/shortlist/disagreement rows, shortlist export parity, agreement rate stat, stats link from matches header. All derivations against existing D1/KV data — no schema migration.
 - PWA: manifest, service worker caches bundle and dataset, install banner.
 - Export shortlist (JSON + printable HTML).
 - Post-deck shortlist pass: once partners have a matches set, give them a "narrow this to a top 5" mode. Different intent (decision) than the main deck (discovery). Storage probably a new KV key per session, or localStorage if it stays personal.
@@ -55,23 +56,37 @@ Foundational work that's a precondition for inviting strangers. Originally bundl
 
 DoD: post link in name-nerd subreddits; get unprompted "I used this with my partner" replies; nothing breaks under that load.
 
-## Phase 1.6 — Self-host target
+Outstanding at handoff to 1.6: functional code is complete. Remaining is the real PWA icon artwork (`static/icons/icon-192.png`, `icon-512.png` — currently placeholders, the one art item gating the public flip; favicon/og/screenshot are present and acceptable), maintainer dashboard ops (Web Analytics token, Cron Trigger, WAF rules), and the W2.2b dual-write removal — all rolled into Phase 1.6 rather than tracked here.
 
-Goal: a fork-and-run path that does not require a Cloudflare account. The W1.5 repo-public flip is gated on this so first-time visitors who do not want to depend on the maintainer's Cloudflare tenancy have an out.
+## Phase 1.6 — Self-host target (in progress since 2026-05-29)
 
-Slotted between Phase 1.5 close and the W1.5 repo-public flip. Cloudflare Pages remains the canonical deploy target — self-host is parity-or-skip, never the lead. Effort is low because D1 is SQLite under the hood, `better-sqlite3` is already a devDep (used by the test path), and storage already takes a `SessionEnv { kv, db }` object so the integration seam is narrow.
+Goal: a maintained fork-and-run path that needs no Cloudflare account. As of this phase, **self-host (Docker + Node + SQLite) is the primary deployment story** the project documents and maintains. The maintainer's Cloudflare Pages instance stays green with minimal effort — it is the maintainer's host, not the lead. The repo-public flip is gated on this so first-time visitors are never forced to depend on the maintainer's Cloudflare tenancy.
 
-- Storage abstraction: thin `BrambleKV` / `BrambleDB` interfaces wrapping only the surface used today (`get<T>(key, 'json')` / `put`; `prepare().bind().run/first/all`). Cloudflare impls are pass-throughs; Node impls back onto `better-sqlite3` plus a `kv` table.
-- Adapter switch: `BRAMBLE_TARGET=node|cloudflare` env var picks `@sveltejs/adapter-node` or `@sveltejs/adapter-cloudflare` at build time. Default stays `cloudflare`.
-- `src/hooks.server.ts` boot singleton populates `event.locals.kv` / `event.locals.db` on the Node target. Every server route switches from `platform.env.VOTES`/`platform.env.DB` to a single `getStorage(event)` helper that returns the same shape on either target.
-- Dockerfile (multi-stage Debian-slim base for `better-sqlite3` native build) plus `docker-compose.yml` with a SQLite volume and documented env vars. `pnpm db:migrate:local` equivalent runs at container start.
-- Node-side equivalents for Cloudflare-only Phase 1.5 features: in-process rate limiter (replaces W3.4 dashboard rules), `pnpm prune` script + host cron line (replaces W3.3 Cron Trigger), conditional Web Analytics beacon (W3.2 skipped on Node), `sqlite3 .backup` cron documented (replaces W3.7 Time Travel).
+This is also where the project gets a pin in it: after 1.6 lands and the repo goes public, Bramble is "done for now." Phases 2–4 are parked (see below).
+
+Effort is contained because D1 is SQLite under the hood, `better-sqlite3` is already a devDep (the test path uses a D1-compatible shim that becomes the production Node adapter), and storage already flows through a `SessionEnv { kv, db }` seam. **SQLite only** — no Postgres; D1 and `better-sqlite3` share the SQLite dialect and `?` placeholders, so business-logic SQL is portable and the seam stays thin.
+
+- Storage seam: thin `BrambleDB` / `BrambleKV` interfaces (strict subsets of D1/KV, so Cloudflare bindings satisfy them with zero wrapping). A `getStorage(event)` helper returns `{ db, kv }` on either target. Node impl backs onto `better-sqlite3` plus a `kv` table.
+- Converge the W2.2b dual-write: SQL is the source of truth on both targets, KV holds only `session:{id}:meta`. (Closes the half-migrated W2.2a state; the production soak window from 2026-05-05 has long elapsed.)
+- Adapter switch: `BRAMBLE_TARGET=node|cloudflare` picks `@sveltejs/adapter-node` or `@sveltejs/adapter-cloudflare` at build time. Default stays `cloudflare`. `better-sqlite3` is excluded from the Cloudflare bundle via dynamic import (native module).
+- Dockerfile (multi-stage `node:22-bookworm-slim` for the `better-sqlite3` native build) plus `docker-compose.yml` with a single service and a SQLite volume. Migrations run lazily on the first request inside `getNodeStorage()` — there is no separate migrate step at container start. Documented env vars including required `ORIGIN` (adapter-node CSRF on form POSTs).
+- Node-side equivalents for Cloudflare-only Phase 1.5 features: in-process fixed-window rate limiter in `hooks.server.ts` (replaces W3.4 WAF rules), `pnpm prune` CLI + documented host cron (replaces W3.3 Cron Trigger), conditional Web Analytics beacon already skipped on Node (W3.2), `sqlite3 .backup` host cron documented (replaces W3.7 Time Travel). Retention parameterized via `BRAMBLE_RETENTION_DAYS` (default 90).
 - Feature matrix in `ARCHITECTURE.md` recording Cloudflare-vs-Node behaviour for every Phase 1.5+ feature. New phases must fill it in.
-- README "Self-host" section plus a `PHASE-1.6.md` executable task list when the phase becomes active.
+- README "Self-host" section, contributor essentials (CONTRIBUTING / CODE_OF_CONDUCT / SECURITY / templates / `.env.example`), CI test gate, real PWA icons, and a `PHASE-1.6.md` executable task list.
 
-DoD: `docker compose up` on a clean host brings up the app on a documented port; two browsers can join the same session and see mutual matches without any Cloudflare account; shortlist add/remove and JSON/HTML export work; the canonical Cloudflare deploy stays green via `pnpm build && wrangler pages deploy`; `pnpm test` and `pnpm check` pass on both target builds.
+DoD:
+- `docker compose up` on a clean host brings up the app on a documented port with no Cloudflare account.
+- Two browsers join the same session and see mutual matches; shortlist add/remove and JSON/HTML export work.
+- In-process rate limiting and daily prune work on the Node target.
+- The maintainer's Cloudflare deploy stays green via the unchanged `pnpm build` → `wrangler pages deploy` path; `better-sqlite3` never enters the Workers bundle.
+- `pnpm test` and `pnpm check` pass on both target builds; CI gates pull requests.
+- Repo is public with contributor essentials in place.
+
+> **Phases 2–4 are parked after 1.6.** They capture the long-term vision but carry no committed work. The project is intentionally small and "done for now" once self-host ships and the repo is public. Revisit only if real demand appears.
 
 ## Phase 2 — Feature Parity with Free Nameberry
+
+> **Parked after 1.6.** Phases 2–4 below are the long-term vision, not committed work. No active development until real demand justifies un-parking them.
 
 Goal: a stranger arrives via Google for "Norse boy names," lands on a name detail page, signs up, completes a couple swipe session.
 

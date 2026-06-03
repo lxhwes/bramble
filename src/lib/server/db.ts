@@ -8,7 +8,13 @@
  *
  * No business logic lives here. This module is the boundary between
  * SvelteKit's platform object and the typed query layer.
+ *
+ * Shortlist helper params use BrambleDB so both Cloudflare (D1Database
+ * satisfies BrambleDB structurally) and Node (makeSqliteAdapter) can call them
+ * without wrapping.
  */
+
+import type { BrambleDB } from './storage/types.js';
 
 // ---------------------------------------------------------------------------
 // Row interfaces
@@ -100,7 +106,7 @@ export function getDb(platform: App.Platform): D1Database {
  * Uses INSERT OR IGNORE so repeated calls are safe (idempotent).
  */
 export async function addToShortlist(
-	db: D1Database,
+	db: BrambleDB,
 	sessionId: string,
 	name: string,
 	sex: 'M' | 'F',
@@ -119,7 +125,7 @@ export async function addToShortlist(
  * No-op if the row does not exist.
  */
 export async function removeFromShortlist(
-	db: D1Database,
+	db: BrambleDB,
 	sessionId: string,
 	name: string,
 	sex: 'M' | 'F',
@@ -136,7 +142,7 @@ export async function removeFromShortlist(
  * Returns all shortlisted names for a session, ordered by insertion time.
  */
 export async function getShortlist(
-	db: D1Database,
+	db: BrambleDB,
 	sessionId: string,
 ): Promise<Shortlist[]> {
 	const { results } = await db

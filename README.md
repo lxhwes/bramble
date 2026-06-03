@@ -31,22 +31,69 @@ Existing name apps charge for the swipe-and-match feature, even though the under
 
 ## Stack
 
-SvelteKit + TypeScript + Tailwind on Cloudflare Pages. Cloudflare D1 for vote storage, Cloudflare KV for hot session state. The name dataset is preprocessed at build time from SSA + Behind the Name into a static JSON blob bundled with the app — no runtime API calls, served from the edge.
+SvelteKit + TypeScript + Tailwind. Two build targets:
+
+- **Cloudflare Pages** (`BRAMBLE_TARGET=cloudflare`, default) — the maintainer's hosted instance. D1 for vote storage, KV for hot session state, edge WAF for rate limiting.
+- **Docker / Node** (`BRAMBLE_TARGET=node`) — the primary self-host path. `better-sqlite3` SQLite file for votes and session meta, in-process rate limiter.
+
+The name dataset is preprocessed at build time into a static JSON blob — no runtime API calls.
+
+## Self-host
+
+```bash
+docker compose up -d
+# App is available at http://localhost:3000
+```
+
+### Environment variables
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `BRAMBLE_TARGET` | yes | `cloudflare` | Must be `node` for self-host |
+| `ORIGIN` | yes | — | Full origin URL (e.g. `https://names.example.com`) — needed for CSRF on form POSTs |
+| `BRAMBLE_DB_PATH` | no | `/data/bramble.sqlite` | Path to the SQLite database file |
+| `PORT` | no | `3000` | Port the HTTP server listens on |
+| `BRAMBLE_RETENTION_DAYS` | no | `90` | Inactive-session prune window in days |
+| `ADDRESS_HEADER` | no | — | Header to read client IP from (e.g. `X-Forwarded-For`) when behind a reverse proxy |
+| `XFF_DEPTH` | no | — | Number of trusted reverse proxies in the `X-Forwarded-For` chain |
+| `PUBLIC_CF_ANALYTICS_TOKEN` | no | — | Cloudflare Web Analytics token; leave unset to disable the beacon |
+
+Migrations run automatically on first startup for the node target.
+
+### Cron jobs
+
+Add these to the host's crontab (or equivalent):
+
+```bash
+# Prune sessions inactive for more than BRAMBLE_RETENTION_DAYS days — run daily
+0 4 * * * cd /path/to/bramble && pnpm prune
+
+# SQLite backup — adjust destination as needed
+30 4 * * * sqlite3 /data/bramble.sqlite ".backup '/backups/bramble-$(date +\%F).sqlite'"
+```
+
+### Horizontal scaling caveat
+
+The in-process rate limiter is per-process. If you run multiple replicas behind a load balancer, add a reverse-proxy rate limit (e.g. nginx `limit_req`) in front.
 
 ## Development
 
 ```bash
 pnpm install
-pnpm db:migrate:local  # apply D1 migrations to the local emulator
+pnpm db:migrate:local  # apply D1 migrations to the local emulator (Cloudflare target)
 pnpm dev               # vite dev server (local KV + D1 via wrangler)
 pnpm check             # wrangler types + svelte-check (zero warnings)
 pnpm lint              # Biome
 pnpm test              # vitest
-pnpm build             # production build via adapter-cloudflare
+pnpm build             # production build (BRAMBLE_TARGET=cloudflare by default)
 pnpm build:names       # regenerate static/names.json from data/ssa + data/btn
 ```
 
 PWA flows: test via `pnpm build && pnpm preview` (service worker registration is skipped in dev).
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide. The short version: follow [Conventional Commits](https://www.conventionalcommits.org/) and make sure `pnpm lint && pnpm check && pnpm test` passes before opening a PR.
 
 ## Project docs
 

@@ -9,14 +9,35 @@
  * call it with only the D1 binding and a clock value.
  */
 
-const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+import type { BrambleDB } from './storage/types.js';
+
+const DEFAULT_RETENTION_DAYS = 90;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * Resolves the retention window in milliseconds.
+ *
+ * Reads `BRAMBLE_RETENTION_DAYS` from the environment, falling back to 90 days
+ * when unset or unparseable. This is read at call time (not module load time)
+ * so tests can set the env variable before calling without module-reload tricks.
+ */
+function resolveRetentionMs(): number {
+	const raw = process.env.BRAMBLE_RETENTION_DAYS;
+	if (raw !== undefined) {
+		const days = Number(raw);
+		if (Number.isFinite(days) && days > 0) return days * MS_PER_DAY;
+	}
+	return DEFAULT_RETENTION_DAYS * MS_PER_DAY;
+}
 
 /**
  * Deletes all sessions (and their associated partners, votes, and shortlist
  * rows) that have had no activity within the retention window.
  *
- * The cutoff is `nowMs - 90 days`.  Sessions with no votes at all are treated
- * as orphans and are also pruned.
+ * The retention window defaults to `BRAMBLE_RETENTION_DAYS` env (90 days when
+ * unset). Pass an explicit `retentionMs` to override — useful in tests.
+ *
+ * Sessions with no votes at all are treated as orphans and are also pruned.
  *
  * Deletion order respects FK constraints:
  *   shortlists → votes → partners → sessions
@@ -24,10 +45,11 @@ const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
  * Returns the number of sessions deleted.
  */
 export async function pruneInactiveSessions(
-	db: D1Database,
+	db: BrambleDB,
 	nowMs: number,
+	retentionMs: number = resolveRetentionMs(),
 ): Promise<number> {
-	const cutoff = nowMs - RETENTION_MS;
+	const cutoff = nowMs - retentionMs;
 
 	// Identify sessions to delete: no vote newer than cutoff (or no votes at all).
 	// LEFT JOIN ensures orphan sessions (no partners / no votes) are included.

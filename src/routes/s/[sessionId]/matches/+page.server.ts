@@ -1,13 +1,11 @@
 import { error } from '@sveltejs/kit';
 import { getMatches } from '$lib/server/sessions';
+import { getStorage } from '$lib/server/storage';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, platform }) => {
-	if (!platform) throw error(500, 'Platform not available');
-	const result = await getMatches(
-		{ kv: platform.env.VOTES, db: platform.env.DB },
-		params.sessionId,
-	);
+	const env = await getStorage(platform);
+	const result = await getMatches(env, params.sessionId);
 
 	// getMatches returns partnerSlugs: [] when the session does not exist in KV
 	// (getSessionMeta returns null inside getMatches → meta?.partnerSlugs ?? []).

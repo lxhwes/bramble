@@ -1,7 +1,21 @@
 {
 	"name": "bramble",
-	"private": true,
 	"version": "0.0.1",
+	"description": "Open-source baby-name swipe app for couples — swipe independently, find mutual matches.",
+	"license": "MIT",
+	"author": "Alex Howes",
+	"homepage": "https://bramble.oovoid.com",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/lxhwes/bramble.git"
+	},
+	"bugs": {
+		"url": "https://github.com/lxhwes/bramble/issues"
+	},
+	"engines": {
+		"node": ">=22",
+		"pnpm": ">=10"
+	},
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
@@ -12,6 +26,10 @@
 		"check": "wrangler types --check && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"gen": "wrangler types",
+		"build:cf": "wrangler types --check && vite build",
+		"build:node": "BRAMBLE_TARGET=node vite build && tsx scripts/bundle-prune.ts",
+		"start:node": "node build/index.js",
+		"prune": "BRAMBLE_TARGET=node tsx scripts/prune-cli.ts",
 		"build:names": "tsx scripts/build-names.ts",
 		"db:migrate:local": "wrangler d1 migrations apply bramble --local",
 		"lint": "biome check .",
@@ -21,13 +39,14 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.14",
-		"@types/better-sqlite3": "^7.6.13",
-		"better-sqlite3": "^11.0.0",
 		"@sveltejs/adapter-cloudflare": "^7.2.8",
+		"@sveltejs/adapter-node": "^5.5.4",
 		"@sveltejs/kit": "^2.57.0",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
 		"@tailwindcss/vite": "^4.2.2",
+		"@types/better-sqlite3": "^7.6.13",
 		"@types/qrcode": "^1.5.6",
+		"esbuild": "0.27.3",
 		"svelte": "^5.55.2",
 		"svelte-check": "^4.4.6",
 		"tailwindcss": "^4.2.2",
@@ -38,6 +57,7 @@
 		"wrangler": "^4.81.0"
 	},
 	"dependencies": {
+		"better-sqlite3": "^11.0.0",
 		"qrcode": "^1.5.4"
 	}
 }

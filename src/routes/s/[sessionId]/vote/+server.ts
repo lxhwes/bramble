@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 import type { VoteEntry } from '$lib/server/sessions';
 import { appendVotes } from '$lib/server/sessions';
+import { getStorage } from '$lib/server/storage';
 import type { RequestHandler } from './$types';
 
 const SLUG_RE = /^[a-z0-9-]{1,32}$/;
@@ -38,16 +39,8 @@ export const POST: RequestHandler = async ({ request, params, platform }) => {
 		throw error(400, 'invalid');
 	}
 
-	if (!platform) {
-		throw error(500, 'Platform not available');
-	}
-
-	await appendVotes(
-		{ kv: platform.env.VOTES, db: platform.env.DB },
-		params.sessionId,
-		slug,
-		votes,
-	);
+	const env = await getStorage(platform);
+	await appendVotes(env, params.sessionId, slug, votes);
 
 	return new Response(null, { status: 204 });
 };

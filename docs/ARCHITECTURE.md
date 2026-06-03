@@ -14,6 +14,8 @@ D1 is the source of truth for vote storage as of Phase 1.5 (W2.2a, 2026-05-05). 
 
 Phase 0 ran KV-only. The public-launch-prep cutover (W1.6/W2.1/W2.2a) added the D1 schema and migrated votes; KV dual-write is retained as a safety net pending W2.2b's removal after a one-week production soak.
 
+The storage implementation is behind a `getStorage()` seam in `src/lib/server/storage/`. Which backend is loaded is determined at build time by the `BRAMBLE_TARGET` environment variable (`cloudflare` uses D1 + KV; `node` uses `better-sqlite3`). `better-sqlite3` is excluded from the Cloudflare Worker bundle via build-time dead-code elimination.
+
 ### No auth
 
 Sessions are identified by a UUID in the URL. Partners within a session are identified by a slug in `?p=`. That's enough trust for two people who already share a relationship and a phone plan. Magic-link auth was considered for Phase 1.5 (W2.3) and dropped 2026-05-08 — URL-shared anonymous sessions are now the permanent access pattern. No PII is collected, so no privacy policy is required.
@@ -27,6 +29,19 @@ The build script merges:
 - **Behind the Name bulk synonyms export** (`data/btn/btn_givennames_synonyms.txt`) — name + gender + comma-separated related-name synonyms. The bulk file declares CC BY-SA 4.0 in its own header (a separate license grant from BTN's website terms). BTN's lookup API does not expose etymology or meaning text — those are website-only — so origin/meaning are not part of the bundled dataset.
 
 For Phase 0 we filter to names appearing ≥100 times in any year between 1995 and 2024. Yields ~3–5k names, manageable card deck size, reasonable popularity floor.
+
+## Cloudflare vs Node feature matrix
+
+| Concern | Cloudflare | Node (self-host) | Notes |
+|---|---|---|---|
+| Storage | D1 (votes) + KV (hot session meta) | `better-sqlite3` SQLite file + `kv` table | Both behind the `getStorage()` seam in `src/lib/server/storage/` |
+| Build adapter | `@sveltejs/adapter-cloudflare` | `@sveltejs/adapter-node` | Selected by `BRAMBLE_TARGET` in `svelte.config.js` |
+| Rate limiting | Cloudflare edge WAF (dashboard-configured) | In-process fixed-window limiter in `src/hooks.server.ts` | Same thresholds; node limiter is per-process |
+| Cron / pruning | Cloudflare Cron Trigger via `wrangler.toml` + `patch-worker.ts` | `pnpm prune` on a host cron | Both call the same `pruneInactiveSessions()` helper |
+| Backups | D1 Time Travel (7-day PITR) | `sqlite3 .backup` host cron | Same accepted-loss posture |
+| Web Analytics | Cloudflare Web Analytics beacon (optional) | Beacon skipped when `PUBLIC_CF_ANALYTICS_TOKEN` is unset | Token unset by default on self-host |
+| Client IP | Cloudflare header, handled by edge | `ADDRESS_HEADER` / `XFF_DEPTH` env vars | Needed for accurate rate-limit keying behind a reverse proxy |
+| Migrations | `wrangler d1 migrations apply` + `patch-worker.ts` scheduled handler | Auto-applied lazily on startup | Node target runs migrations on first boot |
 
 ## Data model
 
@@ -84,19 +99,30 @@ Two Cloudflare WAF rate limiting rules protect the write surface. Both are confi
    - Requests: `5` per `1 minute`
    - Action: **Block** — Duration: `1 minute`
 
-### No app-side middleware
+### No app-side middleware (Cloudflare target)
 
-These rules are enforced at the Cloudflare edge before the Worker runs, so no `hooks.server.ts` middleware is needed. If Bramble gains a self-host target (Phase 1.6), a lightweight in-process fallback should be evaluated at that point.
+These rules are enforced at the Cloudflare edge before the Worker runs, so no `hooks.server.ts` middleware is needed for the Cloudflare target.
+
+### In-process rate limiter (node target)
+
+`src/hooks.server.ts` implements a fixed-window in-process rate limiter that is active only when `BRAMBLE_TARGET=node`. It mirrors the WAF thresholds exactly:
+
+| Rule | Path | Method | Threshold |
+|------|------|--------|-----------|
+| vote-append | `/s/*/vote` | POST | 30 req / 60 s / IP |
+| session-create | `/` | POST | 5 req / 60 s / IP |
+
+Because the limiter is in-process, it is per-replica. Running multiple replicas behind a load balancer requires an additional reverse-proxy rate limit (e.g. nginx `limit_req`).
 
 ## Session retention
 
-Sessions and their votes are deleted 90 days after the last vote. The 90-day window was chosen because swipe activity is decision-driven: once a couple picks a name (or moves on), the vote history loses meaning, and indefinite retention is just storage drift.
+Sessions and their votes are deleted after a configurable inactivity window (default 90 days, set via `BRAMBLE_RETENTION_DAYS`). The 90-day default was chosen because swipe activity is decision-driven: once a couple picks a name (or moves on), the vote history loses meaning, and indefinite retention is just storage drift.
 
 ### Implementation
 
-- `pruneInactiveSessions(db, nowMs)` in `src/lib/server/prune.ts` deletes from `votes`/`partners`/`shortlists`/`sessions` for sessions whose newest vote is older than 90 days, plus orphan sessions with no votes at all.
-- `src/lib/server/scheduled.ts` is the Cloudflare scheduled-event entry that calls the prune helper.
-- The cron schedule lives in `wrangler.toml` `[triggers]`: `crons = ["0 4 * * *"]` — daily at 04:00 UTC. Daily granularity is fine for a 90-day window; being off by one day is inconsequential.
+- `pruneInactiveSessions(db, nowMs)` in `src/lib/server/prune.ts` deletes from `votes`/`partners`/`shortlists`/`sessions` for sessions whose newest vote is older than `BRAMBLE_RETENTION_DAYS` days, plus orphan sessions with no votes at all.
+- **Cloudflare target**: `src/lib/server/scheduled.ts` is the Cloudflare scheduled-event entry that calls the prune helper. The cron schedule lives in `wrangler.toml` `[triggers]`: `crons = ["0 4 * * *"]` — daily at 04:00 UTC.
+- **Node target**: pruning is triggered by running `pnpm prune` (`scripts/prune-cli.ts`) on a host cron. Daily granularity is fine for a 90-day window; being off by one day is inconsequential.
 
 ### Why `scripts/patch-worker.ts` exists
 
@@ -114,13 +140,19 @@ Cloudflare Web Analytics — first-party, cookie-less, free tier — is the only
 
 No Google Analytics, no Plausible, no Sentry. The About page's "no third-party analytics" promise is enforceable because Cloudflare Web Analytics is first-party and reads no cookies.
 
-## D1 backup posture
+## Backup posture
+
+### Cloudflare target
 
 Cloudflare D1 Time Travel provides automatic point-in-time recovery for the last 7 days. That's the canonical backup. Restore via `wrangler d1 time-travel restore bramble --timestamp=<iso8601>`.
 
 Pre-migration discipline: maintainer runs `wrangler d1 export bramble --output=backups/<date>-pre-migration.sql` before any risky migration as a belt-and-suspenders snapshot. The export file is gitignored — store it locally or upload to R2 if longer retention matters for that specific migration.
 
-Older-than-7-day data loss is accepted. Bramble is personal-tool grade; swipe votes lose meaning shortly after a name decision is made, and a hard recovery scenario beyond a week of history isn't worth the automation cost. No backup automation, no cron-driven exports, no off-platform replication.
+### Node target
+
+SQLite file is backed up via `sqlite3 .backup` on a host cron. Same accepted-loss posture: older-than-last-backup data loss is accepted.
+
+Bramble is personal-tool grade; swipe votes lose meaning shortly after a name decision is made, and a hard recovery scenario isn't worth automation cost. No off-platform replication.
 
 ## Deployment
 
@@ -138,7 +170,7 @@ Older-than-7-day data loss is accepted. Bramble is personal-tool grade; swipe vo
 ## Things deliberately not used
 
 - **No Vercel.** Same shape as Cloudflare for our purposes; no reason to fragment.
-- **No Supabase / Postgres.** Overkill for this data shape. D1 is plenty.
+- **No Supabase / Postgres.** Overkill for this data shape. The Cloudflare target uses D1; the self-host target uses `better-sqlite3`. Postgres is intentionally unsupported on both paths.
 - **No React.** Fine framework, but Svelte's single-file components and lower ceremony fit a solo project better.
 - **No auth at all.** URL-shared anonymous sessions are the access pattern. Magic-link auth was scoped for Phase 1.5 (W2.3) and dropped 2026-05-08 — couples who already share a phone plan don't need an account, and no auth means no PII means no privacy policy.
 - **No third-party analytics** (Google Analytics, Plausible, Mixpanel). Cloudflare Web Analytics is first-party and cookieless — see § Web Analytics.

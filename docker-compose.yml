@@ -1,0 +1,48 @@
+# Bramble self-host — single-container deployment backed by SQLite
+#
+# Quick start:
+#   docker compose up -d
+#
+# Daily data-retention prune (add to host crontab):
+#   0 3 * * * docker compose -f /path/to/docker-compose.yml exec -T app node build/prune.js
+#
+# Retention window is controlled by BRAMBLE_RETENTION_DAYS (default 90 days).
+#
+# SQLite backup (run from host, safe with WAL mode):
+#   docker compose exec app sqlite3 "$BRAMBLE_DB_PATH" ".backup '/data/backup-$(date +%F).sqlite'"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - bramble-data:/data
+    restart: unless-stopped
+    environment:
+      BRAMBLE_TARGET: node
+
+      # REQUIRED in production: adapter-node rejects cross-origin form POSTs.
+      # Set to the public URL callers use, e.g. https://bramble.example.com
+      ORIGIN: ${ORIGIN:-http://localhost:3000}
+
+      BRAMBLE_DB_PATH: /data/bramble.sqlite
+      BRAMBLE_MIGRATIONS_DIR: /app/migrations
+
+      # Optional: days of vote history to retain (used by the prune script).
+      # Unset means no pruning.
+      BRAMBLE_RETENTION_DAYS: ${BRAMBLE_RETENTION_DAYS:-90}
+
+      # Optional: uncomment when Bramble sits behind a trusted reverse proxy so
+      # the in-process rate limiter sees the real client IP instead of the
+      # proxy's IP.
+      # ADDRESS_HEADER: X-Forwarded-For
+      # XFF_DEPTH: 1
+
+      # Optional: Cloudflare Web Analytics token (browser-side beacon only).
+      # PUBLIC_CF_ANALYTICS_TOKEN: ""
+
+volumes:
+  bramble-data:

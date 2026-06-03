@@ -2,6 +2,7 @@ import { error } from '@sveltejs/kit';
 import { buildShortlistHtml } from '$lib/export/shortlist';
 import { getShortlist } from '$lib/server/db';
 import { getSessionMeta } from '$lib/server/sessions';
+import { getStorage } from '$lib/server/storage';
 import type { RequestHandler } from './$types';
 
 /**
@@ -9,16 +10,13 @@ import type { RequestHandler } from './$types';
  * export so users can save either as a PDF and compare side-by-side.
  */
 export const GET: RequestHandler = async ({ params, platform }) => {
-	if (!platform) {
-		throw error(500, 'Platform not available');
-	}
-	const env = { kv: platform.env.VOTES, db: platform.env.DB };
+	const env = await getStorage(platform);
 	const meta = await getSessionMeta(env, params.sessionId);
 	if (meta === null) {
 		throw error(404, 'Session not found');
 	}
 
-	const rows = await getShortlist(platform.env.DB, params.sessionId);
+	const rows = await getShortlist(env.db, params.sessionId);
 	const html = buildShortlistHtml(
 		rows.map((r) => ({ name: r.name, sex: r.sex, superSlugs: [] })),
 		params.sessionId,

@@ -1,4 +1,8 @@
-import adapter from '@sveltejs/adapter-cloudflare';
+const target = process.env.BRAMBLE_TARGET ?? 'cloudflare';
+const adapter =
+	target === 'node'
+		? (await import('@sveltejs/adapter-node')).default
+		: (await import('@sveltejs/adapter-cloudflare')).default;
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
