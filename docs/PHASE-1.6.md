@@ -10,7 +10,7 @@ Goal: make self-host (Docker + Node + SQLite) the primary maintained deployment 
 
 Wave 0 blocks everything. Wave 1 is serial after 0. Wave 2 items are internally parallel. Wave 3 is serial after 2 (it's the DoD gate). Waves 4 (docs) and 5 (publishing hygiene) run parallel with 3 — land W5.1 (CI) first. Wave 6 (public flip) is the final serial gate.
 
-`src/hooks.server.ts` is touched by both W0 (boot singleton) and W2.1 (rate limiter) — keep it to one `handle` via `sequence()`.
+`src/hooks.server.ts` is touched by both W0.3 (storage factory) and W2.1 (rate limiter) — keep it to one `handle` via `sequence()`.
 
 ## Wave 0 — Storage seam (prerequisite)
 
@@ -33,9 +33,9 @@ Until routes stop reading `platform.env.*`, a Node build runs but every server r
 
 ### W0.3 — Factory + boot singleton ``
 
-- New: `src/lib/server/storage/index.ts` — `getStorage(event): Storage`. Cloudflare returns `{ db: platform.env.DB, kv: platform.env.VOTES }`; Node returns the singleton via dynamic `import('./node.js')`.
-- New: `src/hooks.server.ts` — boot the Node singleton (migrations run at boot, fail fast); no-op on Cloudflare.
-- Commit: `feat(storage): getStorage factory + hooks boot`.
+- New: `src/lib/server/storage/index.ts` — `getStorage(event): Storage`. Cloudflare returns `{ db: platform.env.DB, kv: platform.env.VOTES }`; Node dynamically imports `./node.js` and calls `getNodeStorage()`.
+- `src/hooks.server.ts` handles rate limiting only (W2.1). The Node storage singleton is created lazily on the first `getStorage()` call, which is when migrations run. A migration failure surfaces as a request-level 500, not a container-start failure.
+- Commit: `feat(storage): getStorage factory + lazy node singleton`.
 
 ### W0.4 — Type-widen + dual-write convergence ``
 
@@ -89,7 +89,7 @@ Internally parallel.
 ### W3.1 — Dockerfile + compose ``
 
 - Multi-stage Dockerfile (`node:22-bookworm-slim`): builder stage installs toolchain + `pnpm build:node`; runtime stage is toolchain-free, copies `build/`, the compiled native module, `migrations/`, prune/migrate scripts, entrypoint. `sqlite3` CLI in the runtime image for the documented backup path.
-- Entrypoint: run migrations against `BRAMBLE_DB_PATH` then `node build/index.js`.
+- Entrypoint: `node build/index.js` only — no separate migrate step. Migrations run lazily on the first request inside `getNodeStorage()`.
 - `docker-compose.yml`: single `app` service, named volume `bramble-data:/data`, `restart: unless-stopped`.
 - Env vars: `BRAMBLE_TARGET=node`, `PORT`, `BRAMBLE_DB_PATH`, **`ORIGIN`** (required — adapter-node rejects cross-origin form POSTs; session-create and vote are form actions), `ADDRESS_HEADER`/`XFF_DEPTH` (client IP behind a proxy, for the rate limiter), `BRAMBLE_RETENTION_DAYS`, `PUBLIC_CF_ANALYTICS_TOKEN` (leave unset).
 - **Gate (ROADMAP DoD):** `docker compose up` on a clean host → two browsers join one `/s/{id}` with different `?p=` slugs → swipe → mutual match appears, shortlist add/remove + JSON/HTML export, no Cloudflare account.
@@ -138,6 +138,12 @@ Internally parallel.
 - Final serial gate: Wave 3 DoD met, CI green on both builds, hygiene + real icons done.
 - `gh secret-scanning` pass before flipping visibility.
 - Repo visibility → public (manual GitHub setting, not a commit). README links the live demo.
+
+## Outstanding
+
+Items shipped without resolution in this phase; carry to the next phase or address explicitly.
+
+- `storage/index.ts` Cloudflare branch uses a `as unknown as` double cast (`platform.env.DB as unknown as Storage['db']`) to assign the D1 binding. A structural `satisfies` check or explicit conformance test would catch future D1 type drift at compile time. Deferred — no runtime impact, low urgency.
 
 ## Anti-tasks (NOT in Phase 1.6)
 
