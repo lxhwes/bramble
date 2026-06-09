@@ -15,7 +15,7 @@ We may migrate to Astro at Phase 2 when per-name SEO pages become the dominant r
 
 The storage implementation is behind a `getStorage()` seam in `src/lib/server/storage/`. The Node target uses a `better-sqlite3` file (votes + a `kv` table). The Cloudflare target uses D1 for vote storage and KV for hot session state (deck cursor per partner, `slug → sessionId` lookup, session meta blob). Both are SQLite under the hood, so business-logic SQL is portable and the seam stays thin. `better-sqlite3` is excluded from the Cloudflare Worker bundle via build-time dead-code elimination.
 
-D1 became the source of truth for vote storage in Phase 1.5 (W2.2a, 2026-05-05); Phase 0 ran KV-only. As of Phase 1.6, SQL is the source of truth on both targets and KV holds only the `session:{id}:meta` blob.
+D1 became the source of truth for vote reads in Phase 1.5 (W2.2a, 2026-05-05); Phase 0 ran KV-only. The KV `session:{id}:partner:{slug}` vote blob is still dual-written on both targets as a safety net — `appendVotes` writes it and `getVotes` falls back to it. Phase 1.6's W0.4 convergence will drop that write/read so KV holds only the `session:{id}:meta` blob; until W0.4 ships (its task in `PHASE-1.6.md` carries no commit hash yet), SQL is authoritative for reads but not yet the sole store.
 
 ### No auth
 
