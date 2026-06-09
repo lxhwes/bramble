@@ -97,12 +97,12 @@ Internally parallel.
 
 ## Wave 4 — Docs (parallel with Wave 3)
 
-### W4.1 — Feature matrix + architecture updates ``
+### W4.1 — Feature matrix + architecture updates `5d0291f, ac8c1d5`
 
 - `ARCHITECTURE.md`: new "Cloudflare-vs-Node feature matrix" (storage, adapter, rate limiting, cron, backups, analytics, client IP, migrations). Update Rate-limiting / Session-retention / backup sections to note the Node path. Replace the "evaluate a self-host fallback" hedge with the concrete design. Document `sqlite3 .backup` host cron (online-safe vs `cp`).
 - Commit: `docs(arch): cloudflare-vs-node feature matrix`.
 
-### W4.2 — README self-host section ``
+### W4.2 — README self-host section `5d0291f, 4b02ac8`
 
 - `README.md`: Self-host section (`docker compose up`, env table, prune/backup cron, multi-replica caveat), Contributing pointer, stack line notes both targets.
 - Commit: `docs(readme): self-host section`.
