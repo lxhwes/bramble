@@ -7,7 +7,8 @@ See:
 - `docs/ARCHITECTURE.md` — stack decisions and rationale
 - `docs/PHASE-0.md` — Phase 0 scope (shipped)
 - `docs/PHASE-1.md` — Phase 1 scope (shipped)
-- `docs/PHASE-1.5.md` — Phase 1.5 scope (active phase)
+- `docs/PHASE-1.5.md` — Phase 1.5 scope (shipped)
+- `docs/PHASE-1.6.md` — Phase 1.6 scope (active phase: self-host target)
 
 ## Quick start
 
@@ -25,14 +26,14 @@ pnpm build:names  # regenerate static/names.json from data/ssa + data/btn
 ## Stack
 
 - **Frontend**: SvelteKit + TypeScript + Tailwind
-- **Hosting**: Cloudflare Pages (uses `@sveltejs/adapter-cloudflare`, which gives us Workers for server routes)
-- **Storage**: Cloudflare D1 for vote storage (source of truth); Cloudflare KV for hot session state (deck cursor, slug→sessionId, etc.). Schema in `migrations/`.
+- **Hosting**: two targets selected by `BRAMBLE_TARGET`. **Node / self-host is the primary documented path** (`@sveltejs/adapter-node` + `better-sqlite3`, shipped as Docker + compose). **Cloudflare Pages** (`@sveltejs/adapter-cloudflare`, the default build) is the maintainer's own hosted instance.
+- **Storage**: behind the `getStorage()` seam in `src/lib/server/storage/`. Node target → a single `better-sqlite3` file (votes + `kv` table). Cloudflare target → D1 for votes (source of truth) + KV for hot session state (deck cursor, slug→sessionId, session meta). Schema in `migrations/`.
 - **Lint/format**: Biome
 - **Data**: SSA national + Behind the Name (CC BY-SA), preprocessed at build time into `static/names.json`
 
 ## Cloudflare tooling
 
-This project deploys to Cloudflare. Prefer the installed Cloudflare MCP/skills over shell calls or pre-trained knowledge:
+The maintainer's hosted instance deploys to Cloudflare. When working on that target, prefer the installed Cloudflare MCP/skills over shell calls or pre-trained knowledge:
 - KV reads/writes against deployed env → `mcp__plugin_cloudflare_cloudflare-bindings__kv_*`
 - Production log inspection → `mcp__plugin_cloudflare_cloudflare-observability__query_worker_observability`
 - Wrangler config/CLI changes → load `cloudflare:wrangler` skill
@@ -88,7 +89,9 @@ Movement rules:
 
 ## Deploy
 
-Push to `main` triggers GH Actions → Cloudflare Pages. Run `pnpm lint && pnpm check && pnpm test && pnpm build` locally before pushing — broken main means broken prod.
+Self-host (the primary documented path) is `docker compose up -d` — Node + SQLite, no Cloudflare account; see the README "Self-host" section.
+
+The maintainer's hosted instance: push to `main` triggers GH Actions → Cloudflare Pages. Run `pnpm lint && pnpm check && pnpm test && pnpm build` locally before pushing — broken main means broken prod. Both target builds must stay green (`pnpm build:cf` and `pnpm build:node`).
 
 ## Licensing
 
