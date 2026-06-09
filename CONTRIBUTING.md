@@ -6,15 +6,7 @@ Scope lives in `docs/ROADMAP.md` (phase-level) and `docs/PHASE-1.6.md` (the acti
 
 ## Local setup
 
-Bramble has two build targets, selected by `BRAMBLE_TARGET` (default `cloudflare`).
-
-### Cloudflare target (the maintainer's hosted instance)
-
-```bash
-pnpm install
-pnpm db:migrate:local   # apply D1 migrations to the local emulator
-pnpm dev                # Vite dev server with local KV + D1 via wrangler
-```
+Bramble has two build targets, selected by `BRAMBLE_TARGET` (default `cloudflare`). Self-host (Node) is the primary deployment path; the Cloudflare target is the maintainer's own hosted instance.
 
 ### Node / self-host target
 
@@ -31,6 +23,14 @@ docker compose up
 ```
 
 See `.env.example` for the full list of environment variables and the README "Self-host" section for details.
+
+### Cloudflare target (the maintainer's hosted instance)
+
+```bash
+pnpm install
+pnpm db:migrate:local   # apply D1 migrations to the local emulator
+pnpm dev                # Vite dev server with local KV + D1 via wrangler
+```
 
 ## Quality gate
 
