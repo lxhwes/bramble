@@ -2,19 +2,20 @@
 
 ## Tech stack
 
-### SvelteKit on Cloudflare Pages
+### SvelteKit, two deploy targets
 
-SvelteKit gives us SSR, routing, and a single-language mental model. The Cloudflare adapter compiles server routes to Workers, so "frontend" and "backend" share one repo, one deploy, and one runtime context. No separate API service.
+SvelteKit gives us SSR, routing, and a single-language mental model — "frontend" and "backend" share one repo, one runtime context, no separate API service. The same app builds for two targets, selected by `BRAMBLE_TARGET` at build time:
+
+- **Node / self-host (primary).** `@sveltejs/adapter-node` produces a plain Node HTTP server backed by a single `better-sqlite3` file. This is the deployment path the project documents and maintains — `docker compose up` with no external accounts. See the [feature matrix](#cloudflare-vs-node-feature-matrix) below.
+- **Cloudflare Pages (the maintainer's host).** `@sveltejs/adapter-cloudflare` compiles server routes to Workers backed by D1 + KV. It is how the maintainer runs the live instance; it is not a prerequisite for anyone else.
 
 We may migrate to Astro at Phase 2 when per-name SEO pages become the dominant route count. Until then, SvelteKit's DX is the right tradeoff.
 
-### Cloudflare D1 + KV
+### Storage: SQLite everywhere, behind one seam
 
-D1 is the source of truth for vote storage as of Phase 1.5 (W2.2a, 2026-05-05). KV continues to hold hot session state where eventual consistency is fine and key-shape is predictable: deck cursor per partner, `slug → sessionId` lookup, session meta blob.
+The storage implementation is behind a `getStorage()` seam in `src/lib/server/storage/`. The Node target uses a `better-sqlite3` file (votes + a `kv` table). The Cloudflare target uses D1 for vote storage and KV for hot session state (deck cursor per partner, `slug → sessionId` lookup, session meta blob). Both are SQLite under the hood, so business-logic SQL is portable and the seam stays thin. `better-sqlite3` is excluded from the Cloudflare Worker bundle via build-time dead-code elimination.
 
-Phase 0 ran KV-only. The public-launch-prep cutover (W1.6/W2.1/W2.2a) added the D1 schema and migrated votes; KV dual-write is retained as a safety net pending W2.2b's removal after a one-week production soak.
-
-The storage implementation is behind a `getStorage()` seam in `src/lib/server/storage/`. Which backend is loaded is determined at build time by the `BRAMBLE_TARGET` environment variable (`cloudflare` uses D1 + KV; `node` uses `better-sqlite3`). `better-sqlite3` is excluded from the Cloudflare Worker bundle via build-time dead-code elimination.
+D1 became the source of truth for vote storage in Phase 1.5 (W2.2a, 2026-05-05); Phase 0 ran KV-only. As of Phase 1.6, SQL is the source of truth on both targets and KV holds only the `session:{id}:meta` blob.
 
 ### No auth
 
@@ -32,16 +33,16 @@ For Phase 0 we filter to names appearing ≥100 times in any year between 1995 a
 
 ## Cloudflare vs Node feature matrix
 
-| Concern | Cloudflare | Node (self-host) | Notes |
+| Concern | Node (self-host, primary) | Cloudflare (maintainer's host) | Notes |
 |---|---|---|---|
-| Storage | D1 (votes) + KV (hot session meta) | `better-sqlite3` SQLite file + `kv` table | Both behind the `getStorage()` seam in `src/lib/server/storage/` |
-| Build adapter | `@sveltejs/adapter-cloudflare` | `@sveltejs/adapter-node` | Selected by `BRAMBLE_TARGET` in `svelte.config.js` |
-| Rate limiting | Cloudflare edge WAF (dashboard-configured) | In-process fixed-window limiter in `src/hooks.server.ts` | Same thresholds; node limiter is per-process |
-| Cron / pruning | Cloudflare Cron Trigger via `wrangler.toml` + `patch-worker.ts` | `pnpm prune` on a host cron | Both call the same `pruneInactiveSessions()` helper |
-| Backups | D1 Time Travel (7-day PITR) | `sqlite3 .backup` host cron | Same accepted-loss posture |
-| Web Analytics | Cloudflare Web Analytics beacon (optional) | Beacon skipped when `PUBLIC_CF_ANALYTICS_TOKEN` is unset | Token unset by default on self-host |
-| Client IP | Cloudflare header, handled by edge | `ADDRESS_HEADER` / `XFF_DEPTH` env vars | Needed for accurate rate-limit keying behind a reverse proxy |
-| Migrations | `wrangler d1 migrations apply` + `patch-worker.ts` scheduled handler | Auto-applied lazily on startup | Node target runs migrations on first boot |
+| Storage | `better-sqlite3` SQLite file + `kv` table | D1 (votes) + KV (hot session meta) | Both behind the `getStorage()` seam in `src/lib/server/storage/` |
+| Build adapter | `@sveltejs/adapter-node` | `@sveltejs/adapter-cloudflare` | Selected by `BRAMBLE_TARGET` in `svelte.config.js` |
+| Rate limiting | In-process fixed-window limiter in `src/hooks.server.ts` | Cloudflare edge WAF (dashboard-configured) | Same thresholds; node limiter is per-process |
+| Cron / pruning | `node build/prune.js` on a host cron (via `docker compose exec`) | Cloudflare Cron Trigger via `wrangler.toml` + `patch-worker.ts` | Both call the same `pruneInactiveSessions()` helper |
+| Backups | `sqlite3 .backup` host cron | D1 Time Travel (7-day PITR) | Same accepted-loss posture |
+| Web Analytics | Beacon skipped when `PUBLIC_CF_ANALYTICS_TOKEN` is unset | Cloudflare Web Analytics beacon (optional) | Token unset by default on self-host |
+| Client IP | `ADDRESS_HEADER` / `XFF_DEPTH` env vars | Cloudflare header, handled by edge | Needed for accurate rate-limit keying behind a reverse proxy |
+| Migrations | Auto-applied lazily on startup | `wrangler d1 migrations apply` + `patch-worker.ts` scheduled handler | Node target runs migrations on first boot |
 
 ## Data model
 
@@ -121,8 +122,8 @@ Sessions and their votes are deleted after a configurable inactivity window (def
 ### Implementation
 
 - `pruneInactiveSessions(db, nowMs)` in `src/lib/server/prune.ts` deletes from `votes`/`partners`/`shortlists`/`sessions` for sessions whose newest vote is older than `BRAMBLE_RETENTION_DAYS` days, plus orphan sessions with no votes at all.
+- **Node target**: pruning runs as `node build/prune.js` on a host cron — typically `docker compose exec -T app node build/prune.js`. `scripts/prune-cli.ts` is the source; `scripts/bundle-prune.ts` compiles it to `build/prune.js` during `build:node` so the runtime image needs no `tsx`/`pnpm`/`scripts/`. Daily granularity is fine for a 90-day window; being off by one day is inconsequential.
 - **Cloudflare target**: `src/lib/server/scheduled.ts` is the Cloudflare scheduled-event entry that calls the prune helper. The cron schedule lives in `wrangler.toml` `[triggers]`: `crons = ["0 4 * * *"]` — daily at 04:00 UTC.
-- **Node target**: pruning is triggered by running `pnpm prune` (`scripts/prune-cli.ts`) on a host cron. Daily granularity is fine for a 90-day window; being off by one day is inconsequential.
 
 ### Why `scripts/patch-worker.ts` exists
 
@@ -156,11 +157,20 @@ Bramble is personal-tool grade; swipe votes lose meaning shortly after a name de
 
 ## Deployment
 
+### Self-host (primary)
+
+- `docker compose up -d` builds the Node image and starts a single container backed by a SQLite volume. Migrations run lazily on the first request; no separate migrate step.
+- Required env: `ORIGIN` (adapter-node CSRF). See the README [Self-host](../README.md#self-host) section for the full env table and host cron jobs (prune + backup).
+
+### Cloudflare (the maintainer's host)
+
 - `wrangler pages deploy` from CI on push to `main`.
 - Subdomain on `oovoid.com` configured by maintainer (CNAME to the Pages project).
 - Branch deploys for PRs (Pages does this automatically).
 
-## Why Cloudflare specifically
+## Why the maintainer runs on Cloudflare
+
+Self-host is the documented path for everyone else; Cloudflare is the maintainer's personal host, chosen for reasons specific to that one deployment:
 
 - Maintainer is already a Cloudflare power user; mental overhead is zero.
 - Free tier covers everything Phase 0–1 needs.
