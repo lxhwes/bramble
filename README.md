@@ -33,8 +33,8 @@ Existing name apps charge for the swipe-and-match feature, even though the under
 
 SvelteKit + TypeScript + Tailwind. Two build targets:
 
-- **Cloudflare Pages** (`BRAMBLE_TARGET=cloudflare`, default) — the maintainer's hosted instance. D1 for vote storage, KV for hot session state, edge WAF for rate limiting.
-- **Docker / Node** (`BRAMBLE_TARGET=node`) — the primary self-host path. `better-sqlite3` SQLite file for votes and session meta, in-process rate limiter.
+- **Docker / Node** (`BRAMBLE_TARGET=node`) — the primary, maintained deployment path. `better-sqlite3` SQLite file for votes and session meta, in-process rate limiter. No Cloudflare account needed. See [Self-host](#self-host) below.
+- **Cloudflare Pages** (`BRAMBLE_TARGET=cloudflare`, default) — the maintainer's own hosted instance. D1 for vote storage, KV for hot session state, edge WAF for rate limiting.
 
 The name dataset is preprocessed at build time into a static JSON blob — no runtime API calls.
 
@@ -50,7 +50,7 @@ docker compose up -d
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
 | `BRAMBLE_TARGET` | yes | `cloudflare` | Must be `node` for self-host |
-| `ORIGIN` | yes | — | Full origin URL (e.g. `https://names.example.com`) — needed for CSRF on form POSTs |
+| `ORIGIN` | yes | `http://localhost:3000` (via compose) | Full origin URL (e.g. `https://names.example.com`) — needed for CSRF on form POSTs. Compose defaults to localhost; override it for any non-local deployment |
 | `BRAMBLE_DB_PATH` | no | `/data/bramble.sqlite` | Path to the SQLite database file |
 | `PORT` | no | `3000` | Port the HTTP server listens on |
 | `BRAMBLE_RETENTION_DAYS` | no | `90` | Inactive-session prune window in days |
@@ -62,14 +62,14 @@ Migrations run automatically on first startup for the node target.
 
 ### Cron jobs
 
-Add these to the host's crontab (or equivalent):
+Add these to the host's crontab (or equivalent). Both run against the container, so the SQLite file inside the `/data` volume is reachable:
 
 ```bash
 # Prune sessions inactive for more than BRAMBLE_RETENTION_DAYS days — run daily
-0 4 * * * cd /path/to/bramble && pnpm prune
+0 4 * * * docker compose -f /path/to/docker-compose.yml exec -T app node build/prune.js
 
-# SQLite backup — adjust destination as needed
-30 4 * * * sqlite3 /data/bramble.sqlite ".backup '/backups/bramble-$(date +\%F).sqlite'"
+# SQLite backup — written into the /data volume (copy it off-box separately as needed)
+30 4 * * * docker compose -f /path/to/docker-compose.yml exec -T app sqlite3 "$BRAMBLE_DB_PATH" ".backup '/data/bramble-$(date +\%F).sqlite'"
 ```
 
 ### Horizontal scaling caveat
@@ -99,6 +99,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide. The short version: fo
 
 - [docs/ROADMAP.md](docs/ROADMAP.md) — phased plan
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — stack decisions
+- [docs/PHASE-1.6.md](docs/PHASE-1.6.md) — self-host target (in progress)
 - [docs/PHASE-0.md](docs/PHASE-0.md), [docs/PHASE-1.md](docs/PHASE-1.md), [docs/PHASE-1.5.md](docs/PHASE-1.5.md) — shipped phase scopes
 
 ## License
