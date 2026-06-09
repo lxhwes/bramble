@@ -89,6 +89,8 @@ pnpm build             # production build (BRAMBLE_TARGET=cloudflare by default)
 pnpm build:names       # regenerate static/names.json from data/ssa + data/btn
 ```
 
+The commands above run against the Cloudflare local emulator. To run the Node / self-host target locally, see the [Node setup in CONTRIBUTING.md](CONTRIBUTING.md#local-setup) (`BRAMBLE_TARGET=node pnpm build:node` + `node build/index.js`).
+
 PWA flows: test via `pnpm build && pnpm preview` (service worker registration is skipped in dev).
 
 ## Contributing

@@ -104,7 +104,7 @@ Internally parallel.
 
 ### W4.2 — README self-host section `5d0291f, 4b02ac8`
 
-- `README.md`: Self-host section (`docker compose up`, env table, prune/backup cron, multi-replica caveat), Contributing pointer, stack line notes both targets.
+- `README.md`: Self-host section (`docker compose up`, env table, prune/backup cron, multi-replica caveat), Contributing pointer, stack line notes both targets. Alignment pass (`4b02ac8`) also corrected the prune/backup cron to the in-container forms (`node build/prune.js`; `docker compose exec ... sqlite3 "$BRAMBLE_DB_PATH"`).
 - Commit: `docs(readme): self-host section`.
 
 ## Wave 5 — Publishing hygiene (parallel; W5.1 first)
