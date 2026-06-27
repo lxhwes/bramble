@@ -1,8 +1,6 @@
 # Bramble
 
-A free, open-source baby name app for couples. Swipe independently, find mutual matches.
-
-> Status: v1 shipped — daily-driven by the maintainer and partner. Hardening for public launch.
+A free, open-source baby name matching app for parents, couples, or anyone! Swipe independently, find mutual matches.
 
 ## Try it
 
