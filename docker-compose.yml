@@ -21,8 +21,22 @@ services:
     volumes:
       - bramble-data:/data
     restart: unless-stopped
+
+    # Optional .env alongside this file (copy .env.example). Anything set here
+    # reaches the container, which is how ADDRESS_HEADER / XFF_DEPTH get set
+    # behind a reverse proxy. Values in `environment:` below always win.
+    # Requires Compose v2.24+ for `required: false`.
+    env_file:
+      - path: .env
+        required: false
+
     environment:
       BRAMBLE_TARGET: node
+
+      # The container always listens on 3000; the `ports` mapping above is what
+      # PORT in .env changes. Pinned here so env_file can't also move the
+      # in-container listener and break the mapping.
+      PORT: 3000
 
       # REQUIRED in production: adapter-node rejects cross-origin form POSTs
       # (session create, shortlist add/remove). Set to the public URL callers
@@ -36,11 +50,10 @@ services:
       # back to 90 days when this is unset — there is no "never prune" value.
       BRAMBLE_RETENTION_DAYS: ${BRAMBLE_RETENTION_DAYS:-90}
 
-      # Optional: uncomment when Bramble sits behind a trusted reverse proxy so
-      # the in-process rate limiter sees the real client IP instead of the
-      # proxy's IP.
-      # ADDRESS_HEADER: X-Forwarded-For
-      # XFF_DEPTH: 1
+      # Behind a reverse proxy, set ADDRESS_HEADER and XFF_DEPTH in .env so the
+      # in-process rate limiter keys on the real client IP instead of the
+      # proxy's. Without them every request shares one bucket, which means the
+      # session-create limit applies to all callers combined.
 
 volumes:
   bramble-data:
