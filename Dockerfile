@@ -37,6 +37,17 @@ RUN pnpm prune --prod
 # ---------------------------------------------------------------------------
 FROM node:22-bookworm-slim AS runtime
 
+# Static OCI metadata. The release workflow adds version/revision/created on
+# top via docker/metadata-action, which is why they are not hardcoded here.
+#
+# `licenses` is an SPDX expression, not just the code license: the image
+# redistributes static/names.json, which is CC BY-SA 4.0. See LICENSE-DATA.md.
+LABEL org.opencontainers.image.title="Bramble" \
+      org.opencontainers.image.description="Open-source baby-name swipe app for couples — swipe independently, find mutual matches." \
+      org.opencontainers.image.source="https://github.com/lxhwes/bramble" \
+      org.opencontainers.image.documentation="https://github.com/lxhwes/bramble#self-host" \
+      org.opencontainers.image.licenses="MIT AND CC-BY-SA-4.0"
+
 # sqlite3 CLI only — supports the documented backup procedure.
 # No build toolchain: the native module is copied from builder (same ABI).
 RUN apt-get update && apt-get install -y --no-install-recommends \
