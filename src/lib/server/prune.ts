@@ -10,6 +10,7 @@
  * would keep a pruned session rendering as an empty session instead of a 404.
  */
 
+import { sessionMetaKey } from './sessions.js';
 import type { Storage } from './storage/types.js';
 
 const DEFAULT_RETENTION_DAYS = 90;
@@ -74,6 +75,21 @@ export async function pruneInactiveSessions(
 	// Build a parameterised IN-clause for the stale session IDs.
 	const ids = stale.map((r) => r.id);
 	const placeholders = ids.map(() => '?').join(', ');
+
+	// Drop the KV session-meta blob before the SQL rows.
+	//
+	// Ordering is deliberate. session:{id}:meta is the key that makes /s/{id}
+	// resolve at all, so if KV succeeds and SQL then fails, the session reads as
+	// gone and the next run finishes the job. The reverse order leaves a session
+	// that still renders but has lost every vote — indistinguishable from data
+	// loss, and nothing ever cleans up the orphaned key.
+	//
+	// Sequential rather than batched: on Cloudflare each delete is a subrequest
+	// against a per-invocation cap, and a sequential loop makes partial progress
+	// instead of failing wholesale.
+	for (const id of ids) {
+		await storage.kv.delete(sessionMetaKey(id));
+	}
 
 	// Delete shortlist rows first (no FK to sessions, keyed by TEXT session_id).
 	await db
