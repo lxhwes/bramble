@@ -20,36 +20,36 @@ anything, and can tell what changed between versions.
 
 - **W1.1** Multi-architecture container images on GHCR (`linux/amd64`,
   `linux/arm64`), built on native runners rather than under QEMU, published on
-  `v*` tag push. — `_______`
+  `v*` tag push. — `9dfaa93`
 - **W1.2** OCI labels on the runtime stage so the package links back to the
   repo. `licenses` is the SPDX expression `MIT AND CC-BY-SA-4.0`, because the
-  image redistributes the dataset. — `_______`
+  image redistributes the dataset. — `a587c23`
 - **W1.3** `docker-compose.yml` pulls the published image; the build path moves
   to `docker-compose.build.yml`. Deliberately not named
-  `docker-compose.override.yml`, which Compose auto-loads. — `_______`
+  `docker-compose.override.yml`, which Compose auto-loads. — `d625112`
 
 ### W2 — Confidence
 
 - **W2.1** Docker build plus runtime smoke test in CI, running in parallel with
   the existing job. Build-only proves little here: `build/prune.js` broke in
-  production twice without CI noticing. — `_______`
-- **W2.2** `scripts/smoke-test.sh`, runnable locally against any image tag. — `_______`
+  production twice without CI noticing. — `1bd012d`
+- **W2.2** `scripts/smoke-test.sh`, runnable locally against any image tag. — `65decff`
 - **W2.3** Dependabot for npm, GitHub Actions, and Docker, with minor and patch
   grouped. This also covers the Node 20 EOL runner deadline recorded in the
-  ROADMAP under Phase 1.5. — `_______`
+  ROADMAP under Phase 1.5. — `17ea3dd`
 
 ### W3 — Legibility
 
 - **W3.1** `CHANGELOG.md` in Keep a Changelog format, with a non-standard
   `### Upgrade notes` subsection — for an app with a persistent volume and
   forward-only migrations, "what must I do before pulling" is the line that
-  matters most. — `_______`
+  matters most. — `4661ee8`
 - **W3.2** A `verify` job asserting the tag matches `package.json` and that
-  `CHANGELOG.md` has a matching section. — `_______`
-- **W3.3** Release ritual documented in `CONTRIBUTING.md`. — `_______`
+  `CHANGELOG.md` has a matching section. — `9dfaa93`
+- **W3.3** Release ritual documented in `CONTRIBUTING.md`. — `4661ee8`
 - **W3.4** LICENSE restored to pristine MIT so GitHub reports `mit` rather than
   `other`; dataset terms move to `LICENSE-DATA.md`, and
-  `static/names.LICENSE.txt` ships inside the image. — `_______`
+  `static/names.LICENSE.txt` ships inside the image. — `2787a16`
 
 ## DoD
 
