@@ -3,7 +3,8 @@
  *
  * Implements the 90-day inactive-session retention policy.  A session is
  * considered inactive when its newest vote is older than the retention window,
- * or when it has no votes at all (orphan session).
+ * or -- for a session with no votes at all -- when it was created before that
+ * window opened.
  *
  * Takes the whole Storage rather than just the database because retention has
  * to clear the KV session-meta key alongside the SQL rows; leaving it behind
@@ -39,7 +40,8 @@ function resolveRetentionMs(): number {
  * The retention window defaults to `BRAMBLE_RETENTION_DAYS` env (90 days when
  * unset). Pass an explicit `retentionMs` to override — useful in tests.
  *
- * Sessions with no votes at all are treated as orphans and are also pruned.
+ * Sessions with no votes at all are pruned once they are older than the window,
+ * measured from `sessions.created_at`.
  *
  * Deletion order respects FK constraints:
  *   shortlists → votes → partners → sessions
@@ -54,8 +56,14 @@ export async function pruneInactiveSessions(
 	const db = storage.db;
 	const cutoff = nowMs - retentionMs;
 
-	// Identify sessions to delete: no vote newer than cutoff (or no votes at all).
-	// LEFT JOIN ensures orphan sessions (no partners / no votes) are included.
+	// Identify sessions to delete: no vote newer than cutoff, or no votes at all
+	// and created before the cutoff. The LEFT JOINs include sessions that have no
+	// partners or no votes.
+	//
+	// A voteless session falls back to created_at rather than being pruned on
+	// sight. The gap between "create a session" and "the other person votes" is
+	// the normal flow, not an orphan, and a nightly cron landing inside it used
+	// to delete a session minutes old.
 	const { results: stale } = await db
 		.prepare(
 			`
@@ -64,10 +72,10 @@ export async function pruneInactiveSessions(
 			LEFT JOIN partners p ON p.session_id = s.id
 			LEFT JOIN votes v ON v.partner_id = p.id
 			GROUP BY s.id
-			HAVING MAX(v.ts) IS NULL OR MAX(v.ts) < ?
+			HAVING MAX(v.ts) < ? OR (MAX(v.ts) IS NULL AND s.created_at < ?)
 		`,
 		)
-		.bind(cutoff)
+		.bind(cutoff, cutoff)
 		.all<{ id: string }>();
 
 	if (stale.length === 0) return 0;

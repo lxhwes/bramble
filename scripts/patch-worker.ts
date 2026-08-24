@@ -57,9 +57,9 @@ async function pruneInactiveSessions(db, kv, nowMs) {
       LEFT JOIN partners p ON p.session_id = s.id
       LEFT JOIN votes v ON v.partner_id = p.id
       GROUP BY s.id
-      HAVING MAX(v.ts) IS NULL OR MAX(v.ts) < ?
+      HAVING MAX(v.ts) < ? OR (MAX(v.ts) IS NULL AND s.created_at < ?)
     \`)
-    .bind(cutoff)
+    .bind(cutoff, cutoff)
     .all();
 
   if (stale.length === 0) return 0;
