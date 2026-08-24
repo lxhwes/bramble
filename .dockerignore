@@ -21,7 +21,7 @@ data
 .DS_Store
 Thumbs.db
 
-# Claude Code per-developer config
+# Per-developer agent/editor config
 .claude
 
 # Playwright CLI artifacts

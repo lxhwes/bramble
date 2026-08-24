@@ -238,8 +238,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide. The short version: fo
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — stack decisions
 - [docs/DATA.md](docs/DATA.md) — where the name dataset comes from and how to rebuild it
 - [docs/BRAND.md](docs/BRAND.md) — palette and icon regeneration
-- [docs/PHASE-1.6.md](docs/PHASE-1.6.md) — self-host target (in progress)
-- [docs/PHASE-0.md](docs/PHASE-0.md), [docs/PHASE-1.md](docs/PHASE-1.md), [docs/PHASE-1.5.md](docs/PHASE-1.5.md) — shipped phase scopes
+- [CHANGELOG.md](CHANGELOG.md) — what changed in each release
+- [docs/history/](docs/history/) — task lists for shipped phases, kept for context
 
 ## License
 

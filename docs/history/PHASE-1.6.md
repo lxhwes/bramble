@@ -2,7 +2,7 @@
 
 **Status:** in progress since 2026-05-29. Not yet shipped.
 
-Goal: make self-host (Docker + Node + SQLite) the primary maintained deployment path, keep the maintainer's Cloudflare instance green, and flip the repo public. See `ROADMAP.md` for the phase goal and DoD; this file is the executable task list. Plan rationale lives in `~/.claude/plans/i-want-to-finish-spicy-clock.md`.
+Goal: make self-host (Docker + Node + SQLite) the primary maintained deployment path, keep the maintainer's Cloudflare instance green, and flip the repo public. See `ROADMAP.md` for the phase goal and DoD; this file is the executable task list.
 
 **Storage backend: SQLite only.** No Postgres — D1 and `better-sqlite3` share the SQLite dialect and `?` placeholders, so the seam stays thin. Cloudflare stays on D1 + KV; the Node target backs onto a single `better-sqlite3` file.
 
