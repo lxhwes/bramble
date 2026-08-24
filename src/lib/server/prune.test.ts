@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import { pruneInactiveSessions } from './prune.js';
+import { sessionMetaKey } from './sessions.js';
 import type { BrambleDB, BrambleKV, Storage } from './storage/types.js';
 
 // ---------------------------------------------------------------------------
@@ -27,7 +28,7 @@ function openWithAllMigrations(): Database.Database {
 
 type D1Row = Record<string, unknown>;
 
-function makeD1Shim(sqlite: Database.Database): BrambleDB {
+function makeD1Shim(sqlite: Database.Database, ops?: string[]): BrambleDB {
 	return {
 		prepare(query: string) {
 			let bound: unknown[] = [];
@@ -41,6 +42,7 @@ function makeD1Shim(sqlite: Database.Database): BrambleDB {
 					return { results };
 				},
 				async run(): Promise<{ meta: { changes: number } }> {
+					ops?.push('sql');
 					const info = sqlite.prepare(query).run(...bound);
 					return { meta: { changes: info.changes } };
 				},
@@ -58,7 +60,10 @@ function makeD1Shim(sqlite: Database.Database): BrambleDB {
 // KV shim (Map-backed)
 // ---------------------------------------------------------------------------
 
-function makeKvShim(store = new Map<string, string>()): BrambleKV {
+function makeKvShim(
+	store = new Map<string, string>(),
+	ops?: string[],
+): BrambleKV {
 	return {
 		async get<T>(key: string): Promise<T | null> {
 			const raw = store.get(key);
@@ -68,20 +73,29 @@ function makeKvShim(store = new Map<string, string>()): BrambleKV {
 			store.set(key, value);
 		},
 		async delete(key: string): Promise<void> {
+			ops?.push(`kv:${key}`);
 			store.delete(key);
 		},
 	};
 }
 
-/** Assembles the Storage that pruneInactiveSessions now takes. */
+/**
+ * Assembles the Storage that pruneInactiveSessions now takes.
+ *
+ * `ops` records the interleaving of KV deletes and SQL writes so the
+ * meta-before-rows ordering can be asserted.
+ */
 function makeStorage(sqlite: Database.Database): {
 	storage: Storage;
 	kvStore: Map<string, string>;
+	ops: string[];
 } {
 	const kvStore = new Map<string, string>();
+	const ops: string[] = [];
 	return {
-		storage: { db: makeD1Shim(sqlite), kv: makeKvShim(kvStore) },
+		storage: { db: makeD1Shim(sqlite, ops), kv: makeKvShim(kvStore, ops) },
 		kvStore,
+		ops,
 	};
 }
 
@@ -95,8 +109,17 @@ interface SeedRow {
 	latestVoteTs: number | null; // null → no votes for this session
 }
 
-function seed(sqlite: Database.Database, rows: SeedRow[]): void {
+function seed(
+	sqlite: Database.Database,
+	rows: SeedRow[],
+	kvStore?: Map<string, string>,
+): void {
 	for (const { sessionId, partnerId, latestVoteTs } of rows) {
+		// Mirror what createSession does, so the meta key is there to delete.
+		kvStore?.set(
+			sessionMetaKey(sessionId),
+			JSON.stringify({ createdAt: 0, partnerSlugs: ['alice'] }),
+		);
 		sqlite
 			.prepare(
 				'INSERT INTO sessions (id, user_id, created_at) VALUES (?, NULL, ?)',
@@ -308,6 +331,113 @@ describe('pruneInactiveSessions', () => {
 
 		const count = await pruneInactiveSessions(storage, now);
 		expect(count).toBe(2);
+	});
+
+	// -------------------------------------------------------------------------
+	// KV session-meta cleanup
+	//
+	// Pruning used to delete only SQL rows, leaving session:{id}:meta in KV
+	// forever. On the node target that KV table lives in the same SQLite file,
+	// so the file grew without bound despite a "bounded" retention window — and
+	// a pruned session still resolved its meta, rendering as an empty session
+	// instead of a 404.
+	// -------------------------------------------------------------------------
+
+	it('deletes the KV meta key for every pruned session', async () => {
+		const sqlite = openWithAllMigrations();
+		const { storage, kvStore } = makeStorage(sqlite);
+		const now = Date.now();
+
+		seed(
+			sqlite,
+			[
+				{
+					sessionId: 's-old-1',
+					partnerId: 'p-old-1',
+					latestVoteTs: now - NINETY_DAYS_MS - 1000,
+				},
+				{
+					sessionId: 's-old-2',
+					partnerId: 'p-old-2',
+					latestVoteTs: now - NINETY_DAYS_MS - 2000,
+				},
+			],
+			kvStore,
+		);
+
+		await pruneInactiveSessions(storage, now);
+
+		expect(kvStore.has(sessionMetaKey('s-old-1'))).toBe(false);
+		expect(kvStore.has(sessionMetaKey('s-old-2'))).toBe(false);
+	});
+
+	it('leaves the KV meta key for sessions that are kept', async () => {
+		const sqlite = openWithAllMigrations();
+		const { storage, kvStore } = makeStorage(sqlite);
+		const now = Date.now();
+
+		seed(
+			sqlite,
+			[
+				{ sessionId: 's-keep', partnerId: 'p-keep', latestVoteTs: now - 1000 },
+				{
+					sessionId: 's-prune',
+					partnerId: 'p-prune',
+					latestVoteTs: now - NINETY_DAYS_MS - 1000,
+				},
+			],
+			kvStore,
+		);
+
+		await pruneInactiveSessions(storage, now);
+
+		expect(kvStore.has(sessionMetaKey('s-keep'))).toBe(true);
+		expect(kvStore.has(sessionMetaKey('s-prune'))).toBe(false);
+	});
+
+	it('deletes KV meta before the SQL rows', async () => {
+		// Ordering is a deliberate failure-mode choice, not an accident. If KV
+		// succeeds and SQL then fails, the session reads as gone and the next run
+		// finishes the job. The reverse leaves a session that still renders but
+		// has lost every vote, which looks like data loss rather than expiry.
+		const sqlite = openWithAllMigrations();
+		const { storage, kvStore, ops } = makeStorage(sqlite);
+		const now = Date.now();
+
+		seed(
+			sqlite,
+			[
+				{
+					sessionId: 's-order',
+					partnerId: 'p-order',
+					latestVoteTs: now - NINETY_DAYS_MS - 1000,
+				},
+			],
+			kvStore,
+		);
+
+		await pruneInactiveSessions(storage, now);
+
+		expect(ops[0]).toBe(`kv:${sessionMetaKey('s-order')}`);
+		expect(ops).toContain('sql');
+		expect(ops.indexOf('sql')).toBeGreaterThan(0);
+	});
+
+	it('does not touch KV when nothing is pruned', async () => {
+		const sqlite = openWithAllMigrations();
+		const { storage, kvStore, ops } = makeStorage(sqlite);
+		const now = Date.now();
+
+		seed(
+			sqlite,
+			[{ sessionId: 's-keep', partnerId: 'p-keep', latestVoteTs: now - 1000 }],
+			kvStore,
+		);
+
+		await pruneInactiveSessions(storage, now);
+
+		expect(ops).toEqual([]);
+		expect(kvStore.has(sessionMetaKey('s-keep'))).toBe(true);
 	});
 
 	it('respects an explicit retentionMs override', async () => {
