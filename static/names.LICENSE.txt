@@ -1,0 +1,28 @@
+names.json — license and attribution
+====================================
+
+This dataset is licensed under Creative Commons Attribution-ShareAlike 4.0
+International (CC BY-SA 4.0).
+
+    https://creativecommons.org/licenses/by-sa/4.0/
+
+It is a derived work combining two sources:
+
+  * US Social Security Administration, national baby name data.
+    https://www.ssa.gov/oact/babynames/
+    A work of the US federal government; public domain.
+    Supplies: name, sex, peak year, total count.
+
+  * Behind the Name, bulk export.
+    https://www.behindthename.com/
+    CC BY-SA 4.0, as declared in the export's own file header.
+    Supplies: related-name lists.
+
+The Behind the Name portion is what makes the combined dataset CC BY-SA 4.0.
+If you redistribute this file, or any modified version of it, you must credit
+both sources, keep it under CC BY-SA 4.0, and indicate any changes you made.
+
+Bramble's application code is separately licensed under the MIT License. The
+dataset license does not extend to it.
+
+    https://github.com/lxhwes/bramble
