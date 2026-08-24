@@ -50,7 +50,7 @@ docker compose up -d
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
 | `BRAMBLE_TARGET` | yes | `cloudflare` | Must be `node` for self-host |
-| `ORIGIN` | yes | `http://localhost:3000` (via compose) | Full origin URL (e.g. `https://names.example.com`) — needed for CSRF on form POSTs. Compose defaults to localhost; override it for any non-local deployment |
+| `ORIGIN` | yes | `http://localhost:3000` (via compose) | Full origin URL (e.g. `https://names.example.com`) — needed for CSRF on form POSTs (session create, shortlist add/remove). Compose defaults to localhost; override it for any non-local deployment |
 | `BRAMBLE_DB_PATH` | no | `/data/bramble.sqlite` | Path to the SQLite database file |
 | `PORT` | no | `3000` | Port the HTTP server listens on |
 | `BRAMBLE_RETENTION_DAYS` | no | `90` | Inactive-session prune window in days |

@@ -4,7 +4,7 @@
 #   docker compose up -d
 #
 # Daily data-retention prune (add to host crontab):
-#   0 3 * * * docker compose -f /path/to/docker-compose.yml exec -T app node build/prune.js
+#   0 4 * * * docker compose -f /path/to/docker-compose.yml exec -T app node build/prune.js
 #
 # Retention window is controlled by BRAMBLE_RETENTION_DAYS (default 90 days).
 #
@@ -24,15 +24,16 @@ services:
     environment:
       BRAMBLE_TARGET: node
 
-      # REQUIRED in production: adapter-node rejects cross-origin form POSTs.
-      # Set to the public URL callers use, e.g. https://bramble.example.com
+      # REQUIRED in production: adapter-node rejects cross-origin form POSTs
+      # (session create, shortlist add/remove). Set to the public URL callers
+      # use, e.g. https://bramble.example.com
       ORIGIN: ${ORIGIN:-http://localhost:3000}
 
       BRAMBLE_DB_PATH: /data/bramble.sqlite
       BRAMBLE_MIGRATIONS_DIR: /app/migrations
 
-      # Optional: days of vote history to retain (used by the prune script).
-      # Unset means no pruning.
+      # Days of inactivity before a session is pruned. The prune script falls
+      # back to 90 days when this is unset — there is no "never prune" value.
       BRAMBLE_RETENTION_DAYS: ${BRAMBLE_RETENTION_DAYS:-90}
 
       # Optional: uncomment when Bramble sits behind a trusted reverse proxy so
