@@ -74,7 +74,10 @@ EXPOSE 3000
 # Persist the SQLite database across container restarts.
 VOLUME ["/data"]
 
+# Probe /healthz, not /. GET / only reads cookies, so it returned 200 with a
+# corrupt database, an unwritable /data volume, or a failed migration while
+# every write 500'd. /healthz runs a real query through getStorage().
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:'+process.env.PORT+'/', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))"
+    CMD node -e "require('http').get('http://localhost:'+process.env.PORT+'/healthz', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
 
 CMD ["node", "build/index.js"]

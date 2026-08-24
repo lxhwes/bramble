@@ -31,9 +31,12 @@ function brokenStorage(): Storage {
 	const db = {
 		prepare: () => ({
 			bind: () => ({
-				all: () => Promise.reject(new Error('database disk image is malformed')),
-				first: () => Promise.reject(new Error('database disk image is malformed')),
-				run: () => Promise.reject(new Error('database disk image is malformed')),
+				all: () =>
+					Promise.reject(new Error('database disk image is malformed')),
+				first: () =>
+					Promise.reject(new Error('database disk image is malformed')),
+				run: () =>
+					Promise.reject(new Error('database disk image is malformed')),
 			}),
 		}),
 	} as unknown as Storage['db'];
