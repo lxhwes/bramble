@@ -37,6 +37,9 @@ services:
         required: false
 
     environment:
+      # Build-time constant, baked into the bundle by Vite's `define`. The image
+      # is already built with it; this line documents the target rather than
+      # switching it. Changing it here has no effect.
       BRAMBLE_TARGET: node
 
       # The container always listens on 3000; the `ports` mapping above is what

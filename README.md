@@ -80,7 +80,7 @@ For any deployment other than `http://localhost:3000`, **set `ORIGIN` to the URL
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `BRAMBLE_TARGET` | yes | `cloudflare` | Must be `node` for self-host |
+| `BRAMBLE_TARGET` | build-time only | `cloudflare` | Selects the adapter and is baked into the bundle at build time. The published image is already built with `node`; setting it at runtime changes nothing |
 | `ORIGIN` | yes | `http://localhost:3000` (via compose) | Full origin URL (e.g. `https://names.example.com`) — needed for CSRF on form POSTs (session create, shortlist add/remove). Compose defaults to localhost; override it for any non-local deployment |
 | `BRAMBLE_DB_PATH` | no | `/data/bramble.sqlite` | Path to the SQLite database file |
 | `PORT` | no | `3000` | Port the HTTP server listens on |

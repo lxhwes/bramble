@@ -32,7 +32,7 @@ DoD met:
 - Tap buttons for yes/no/super alongside swipe + keyboard.
 - Slug persistence + collision detection on the join form.
 
-## Phase 1.5 — Public launch prep
+## Phase 1.5 — Public launch prep (shipped 2026-05-29)
 
 Foundational work that's a precondition for inviting strangers. Originally bundled into Phase 1 in this roadmap, then explicitly deferred when the personal-tool slice took priority.
 
@@ -58,7 +58,7 @@ DoD: post link in name-nerd subreddits; get unprompted "I used this with my part
 
 Outstanding at handoff to 1.6: functional code is complete. Remaining is the real PWA icon artwork (`static/icons/icon-192.png`, `icon-512.png` — currently placeholders, the one art item gating the public flip; favicon/og/screenshot are present and acceptable), maintainer dashboard ops (Web Analytics token, Cron Trigger, WAF rules), and the W2.2b dual-write removal — all rolled into Phase 1.6 rather than tracked here.
 
-## Phase 1.6 — Self-host target (in progress since 2026-05-29)
+## Phase 1.6 — Self-host target (shipped 2026-08-24)
 
 Goal: a maintained fork-and-run path that needs no Cloudflare account. As of this phase, **self-host (Docker + Node + SQLite) is the primary deployment story** the project documents and maintains. The maintainer's Cloudflare Pages instance stays green with minimal effort — it is the maintainer's host, not the lead. The repo-public flip is gated on this so first-time visitors are never forced to depend on the maintainer's Cloudflare tenancy.
 
@@ -74,13 +74,17 @@ Effort is contained because D1 is SQLite under the hood, `better-sqlite3` is alr
 - Feature matrix in `ARCHITECTURE.md` recording Cloudflare-vs-Node behaviour for every Phase 1.5+ feature. New phases must fill it in.
 - README "Self-host" section, contributor essentials (CONTRIBUTING / CODE_OF_CONDUCT / SECURITY / templates / `.env.example`), CI test gate, real PWA icons, and a `history/PHASE-1.6.md` executable task list.
 
-DoD:
-- `docker compose up` on a clean host brings up the app on a documented port with no Cloudflare account.
-- Two browsers join the same session and see mutual matches; shortlist add/remove and JSON/HTML export work.
-- In-process rate limiting and daily prune work on the Node target.
-- The maintainer's Cloudflare deploy stays green via the unchanged `pnpm build` → `wrangler pages deploy` path; `better-sqlite3` never enters the Workers bundle.
-- `pnpm test` and `pnpm check` pass on both target builds; CI gates pull requests.
-- Repo is public with contributor essentials in place.
+DoD met:
+- `docker compose up` on a clean host brings the app up on a documented port with no Cloudflare account. Verified against the built image: it boots, applies migrations lazily, and writes to `/data` as a non-root user.
+- Two partners join the same session and see mutual matches; shortlist add/remove and JSON/HTML export work. Verified over HTTP; the two-browser swipe UI pass is a maintainer check.
+- In-process rate limiting (5 session creates and 30 votes per minute per IP) and the retention prune both work on the Node target, including through a reverse proxy once `ADDRESS_HEADER` and `XFF_DEPTH` are set.
+- SQL is the sole vote store on both targets; KV holds only `session:{id}:meta`, and retention now deletes it, so a self-hosted SQLite file no longer grows without bound.
+- `/healthz` runs a real query, so a corrupt database or unwritable volume marks the container unhealthy instead of letting it report ready while every write fails.
+- The maintainer's Cloudflare deploy stays green via the unchanged `pnpm build` → `wrangler pages deploy` path; CI greps the built bundle to prove `better-sqlite3` never enters it.
+- `pnpm lint`, `pnpm check`, and `pnpm test` pass, and both target builds stay green. CI gates pull requests and, since Phase 1.7, also boots the image.
+- Contributor essentials are in place: CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, issue and PR templates, `.env.example`.
+
+Outstanding at handoff to 1.7: the repo visibility flip itself (W6.1) is a maintainer action, not a commit, and is sequenced after 1.7 because the release workflow's free arm64 runners require a public repo. Per-item deferrals are recorded in `history/PHASE-1.6.md`.
 
 ## Phase 1.7 — Release and packaging (in progress since 2026-08-24)
 

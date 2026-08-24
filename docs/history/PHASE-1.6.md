@@ -1,6 +1,8 @@
 # Phase 1.6: Self-host target
 
-**Status:** in progress since 2026-05-29. Not yet shipped.
+**Status:** shipped 2026-08-24, except W6.1 (the visibility flip), which is a maintainer action rather than a commit.
+
+Release and packaging work — versioned images, changelog, release pipeline — is Phase 1.7, not this phase. This one was scope-locked.
 
 Goal: make self-host (Docker + Node + SQLite) the primary maintained deployment path, keep the maintainer's Cloudflare instance green, and flip the repo public. See `ROADMAP.md` for the phase goal and DoD; this file is the executable task list.
 
@@ -16,13 +18,13 @@ Wave 0 blocks everything. Wave 1 is serial after 0. Wave 2 items are internally 
 
 Until routes stop reading `platform.env.*`, a Node build runs but every server route 500s. Nothing below is useful until this lands.
 
-### W0.1 — Storage interfaces ``
+### W0.1 — Storage interfaces `dfed435`
 
 - New: `src/lib/server/storage/types.ts` — `BrambleStatement { bind(...).all<T>()/.first<T>()/.run() }`, `BrambleDB { prepare(sql) }`, `BrambleKV { get<T>(key,'json'); put(key,value); delete(key) }`, `Storage { db; kv }`. Strict subsets of D1/KV so Cloudflare bindings satisfy them with zero wrapping.
 - First commit: `test(storage): interface conformance for D1 + sqlite shims`.
 - Then: `feat(storage): thin BrambleDB/BrambleKV interfaces`.
 
-### W0.2 — Node SQLite adapter + migration runner ``
+### W0.2 — Node SQLite adapter + migration runner `dfed435`, `ab22e3f`
 
 - New: `src/lib/server/storage/node.ts` (Node-only) — module singleton: open `better-sqlite3`, `pragma('journal_mode = WAL')`, `pragma('foreign_keys = ON')` (connection-scoped — the cascade prune depends on it), run migrations, expose the promoted `makeSqliteAdapter` (the `db.test.ts` shim hardened with statement caching + real `changes`) and a SQLite-backed `BrambleKV`.
 - New: `src/lib/server/storage/migrate.ts` (Node-only) — `_migrations` tracking table, replay `migrations/*.sql` in order via `db.exec()` inside a transaction. No migration library.
@@ -31,13 +33,13 @@ Until routes stop reading `platform.env.*`, a Node build runs but every server r
 - Tests: `src/lib/server/storage/node.test.ts` (end-to-end session/vote/match/prune over in-memory better-sqlite3), `migrate.test.ts` (idempotency + FK cascade).
 - Commits: `test(storage): node adapter end-to-end`, `feat(storage): better-sqlite3 node adapter + kv table`, `feat(storage): startup migration runner`.
 
-### W0.3 — Factory + boot singleton ``
+### W0.3 — Factory + boot singleton `6f0ceaf`
 
 - New: `src/lib/server/storage/index.ts` — `getStorage(event): Storage`. Cloudflare returns `{ db: platform.env.DB, kv: platform.env.VOTES }`; Node dynamically imports `./node.js` and calls `getNodeStorage()`.
 - `src/hooks.server.ts` handles rate limiting only (W2.1). The Node storage singleton is created lazily on the first `getStorage()` call, which is when migrations run. A migration failure surfaces as a request-level 500, not a container-start failure.
 - Commit: `feat(storage): getStorage factory + lazy node singleton`.
 
-### W0.4 — Type-widen + dual-write convergence ``
+### W0.4 — Type-widen + dual-write convergence `e0d04d8`, `aaf4b0b`, `751ae43`, `86d94a2`, `afac366`, `27ad807`, `b3d6bed`, `52f8af6`
 
 - `src/lib/server/db.ts` shortlist helpers: `D1Database` → `BrambleDB`.
 - `src/lib/server/sessions.ts`: `SessionEnv.db` → `BrambleDB | null`, `.kv` → `BrambleKV`. Converge the W2.2b dual-write: `appendVotes` writes votes to SQL (required), drops the KV `partner:{slug}` write; `getVotes` reads SQL, drops the KV fallback. KV keeps only `session:{id}:meta`.
@@ -45,7 +47,7 @@ Until routes stop reading `platform.env.*`, a Node build runs but every server r
 - `scripts/patch-worker.ts`: mirror the `kv.delete` into the inlined prune snippet (keep the CF twin in sync).
 - Commits: `refactor(storage): widen db/sessions/prune to Bramble interfaces`, `feat(db): SQL is source of truth; KV holds session meta only`.
 
-### W0.5 — Migrate route call sites ``
+### W0.5 — Migrate route call sites `6f0ceaf`
 
 - Swap all ~15 `{ kv: platform.env.VOTES, db: platform.env.DB }` and bare `platform.env.DB` call sites to `getStorage(event)`. Routes: `src/routes/+page.server.ts`, `src/routes/s/[sessionId]/+page.server.ts`, `.../vote/+server.ts`, `.../shortlist/+page.server.ts`, `.../shortlist/export.*`, `.../matches/*`, `.../stats/+page.server.ts`.
 - Mechanical; behaviour identical on Cloudflare.
@@ -54,13 +56,13 @@ Until routes stop reading `platform.env.*`, a Node build runs but every server r
 
 ## Wave 1 — Adapter switch + build scripts
 
-### W1.1 — BRAMBLE_TARGET adapter selection ``
+### W1.1 — BRAMBLE_TARGET adapter selection `494dc1c`
 
 - `svelte.config.js`: top-level `await import()` of `@sveltejs/adapter-node` vs `@sveltejs/adapter-cloudflare` keyed on `process.env.BRAMBLE_TARGET` (default `cloudflare`).
 - New devDep `@sveltejs/adapter-node` (build-time only).
 - Commit: `feat(build): select adapter by BRAMBLE_TARGET`.
 
-### W1.2 — Build scripts + patch-worker guard ``
+### W1.2 — Build scripts + patch-worker guard `494dc1c`
 
 - `scripts/patch-worker.ts`: early no-op when `BRAMBLE_TARGET === 'node'` (CF behaviour byte-identical).
 - `package.json`: keep `build` = CF (unchanged); add `build:node` / `build:cf`.
@@ -71,14 +73,14 @@ Until routes stop reading `platform.env.*`, a Node build runs but every server r
 
 Internally parallel.
 
-### W2.1 — In-process rate limiter ``
+### W2.1 — In-process rate limiter `56f6067`, `011c208`, `d2bcf7d`, `b0f7351`, `f801bfd`
 
 - `src/hooks.server.ts` (Node only): in-memory fixed-window per (IP, rule) mirroring the WAF thresholds — `POST /s/{id}/vote` 30/60s, `POST /` 5/60s → 429 + `Retry-After`. IP via `event.getClientAddress()`. No new dep.
 - Cloudflare short-circuits (edge WAF runs first). Per-process; multi-replica out of scope (documented).
 - First commit: `test(ratelimit): fixed-window limiter`.
 - Then: `feat(ratelimit): in-process limiter for node target`.
 
-### W2.2 — Prune CLI + retention env ``
+### W2.2 — Prune CLI + retention env `989d102`, `8b16c80`, `90148a2`
 
 - New: `scripts/prune-cli.ts` (run via `tsx`) calling the unchanged `pruneInactiveSessions`; `pnpm prune` script.
 - Parameterize `prune.ts` `RETENTION_MS` via `BRAMBLE_RETENTION_DAYS` (default 90) with a test.
@@ -86,7 +88,7 @@ Internally parallel.
 
 ## Wave 3 — Container (DoD gate)
 
-### W3.1 — Dockerfile + compose ``
+### W3.1 — Dockerfile + compose `5f68c16`
 
 - Multi-stage Dockerfile (`node:22-bookworm-slim`): builder stage installs toolchain + `pnpm build:node`; runtime stage is toolchain-free, copies `build/`, the compiled native module, `migrations/`, prune/migrate scripts, entrypoint. `sqlite3` CLI in the runtime image for the documented backup path.
 - Entrypoint: `node build/index.js` only — no separate migrate step. Migrations run lazily on the first request inside `getNodeStorage()`.
@@ -109,23 +111,23 @@ Internally parallel.
 
 ## Wave 5 — Publishing hygiene (parallel; W5.1 first)
 
-### W5.1 — CI test gate ``
+### W5.1 — CI test gate `3372350`, `0ddcc93`
 
 - New `.github/workflows/ci.yml` on `pull_request` → install / lint / check / test / `build:cf` / `build:node`.
 - Add `pnpm test` to `deploy.yml` before build.
 - Commit: `ci: gate PRs with tests and both-target builds`.
 
-### W5.2 — package.json metadata ``
+### W5.2 — package.json metadata `3372350`, `4f84699`
 
 - Remove `private: true`; add `description`, `repository`, `author`, `license: "MIT"`, `homepage`/`bugs`, `engines: { node: ">=22", pnpm: ">=10" }` (note `engine-strict=true` — match real versions).
 - Commit: `chore(pkg): public-repo metadata`.
 
-### W5.3 — Contributor essentials ``
+### W5.3 — Contributor essentials `3372350`, `8cd62a6`
 
 - New: `CONTRIBUTING.md` (commit conventions, both-target local setup, lint/check/test gate), `CODE_OF_CONDUCT.md` (Contributor Covenant), `SECURITY.md` (short — no PII, no auth, where to report), `.github/ISSUE_TEMPLATE/`, `.github/PULL_REQUEST_TEMPLATE.md`, `.env.example`.
 - Commit: `docs: contributing, code of conduct, security, templates`.
 
-### W5.4 — Real PWA icons + root cleanup ``
+### W5.4 — Real PWA icons + root cleanup `273ed4f`
 
 - Replace placeholder `static/icons/icon-192.png` / `icon-512.png` with real artwork (the one art item gating the flip).
 - Remove stray root files: `logo-ideas.md`, the long-named Midjourney PNG.
@@ -133,7 +135,7 @@ Internally parallel.
 
 ## Wave 6 — Public flip
 
-### W6.1 — Flip repo public ``
+### W6.1 — Flip repo public _pending — maintainer action_
 
 - Final serial gate: Wave 3 DoD met, CI green on both builds, hygiene + real icons done.
 - `gh secret-scanning` pass before flipping visibility.
@@ -143,7 +145,12 @@ Internally parallel.
 
 Items shipped without resolution in this phase; carry to the next phase or address explicitly.
 
-- `storage/index.ts` Cloudflare branch uses a `as unknown as` double cast (`platform.env.DB as unknown as Storage['db']`) to assign the D1 binding. A structural `satisfies` check or explicit conformance test would catch future D1 type drift at compile time. Deferred — no runtime impact, low urgency.
+- `storage/index.ts` Cloudflare branch uses a `as unknown as` double cast (`platform.env.DB as unknown as Storage['db']`) to assign the D1 binding. A structural `satisfies` check or explicit conformance test would catch future D1 type drift at compile time. Deferred — no runtime impact, low urgency. The cast is now isolated in `cloudflareStorage()` so it lives at exactly one site.
+- No test covers the `getStorage` factory's target branch: `vitest.config.ts` defines no `__BRAMBLE_TARGET__`, so the constant the branch keys on does not exist under test. Both branches are exercised indirectly by the adapter tests and, since `1bd012d`, by the container smoke test.
+- `BRAMBLE_TARGET` is baked at build time by Vite's `define`, so setting it at runtime does nothing. `docker-compose.yml` still sets it and the README env table listed it as required. Documented as build-time-only rather than removed: the published image sets it correctly, and a self-hoster who copies it into `.env` should not be misled into thinking it switches anything.
+- Three prune twins must be kept in sync by hand — `prune.ts`, `scheduled.ts` (typed, imported by nothing), and the `SCHEDULED_SNIPPET` string in `scripts/patch-worker.ts` that actually runs on Cloudflare cron. Nothing checks that they agree.
+- Vote payloads written to KV during the W2.2a dual-write window are now orphaned: nothing reads them and prune does not delete them. That set is closed as of W0.4, so a one-time `wrangler kv` sweep of `session:*:partner:*` clears it. Not worth permanent code in `prune.ts`.
+- `static/og.png` is thin, and Google Fonts are fetched from a third party in `src/app.html`, so a self-hosted instance is not fully self-contained offline. Both carried to Phase 1.7's Outstanding list.
 
 ## Anti-tasks (NOT in Phase 1.6)
 
@@ -157,6 +164,6 @@ If a task seems implied but isn't here, stop and ask.
 
 ## Decisions deferred to maintainer
 
-- Whether to stage the KV-write removal (W0.4) as a separate follow-up commit if zero risk on the hosted instance is preferred over converging now. Default: converge now — the W2.2a soak from 2026-05-05 has long elapsed.
-- Version bump at the public flip (`0.0.1` → `0.1.0`?) — cosmetic.
-- Whether multi-replica self-host needs first-class support, or stays documented-out-of-scope.
+- ~~Whether to stage the KV-write removal (W0.4) as a separate follow-up commit.~~ Resolved 2026-08-24: converged now, as the default said. SQL is the sole vote store on both targets.
+- ~~Version bump at the public flip (`0.0.1` → `0.1.0`?).~~ Resolved in Phase 1.7: `0.1.0`, as the first tagged release rather than a cosmetic bump.
+- Whether multi-replica self-host needs first-class support, or stays documented-out-of-scope. Still open; still documented out of scope.
