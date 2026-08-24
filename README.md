@@ -56,7 +56,7 @@ docker compose up -d
 | `BRAMBLE_RETENTION_DAYS` | no | `90` | Inactive-session prune window in days |
 | `ADDRESS_HEADER` | no | — | Header to read client IP from (e.g. `X-Forwarded-For`) when behind a reverse proxy |
 | `XFF_DEPTH` | no | — | Number of trusted reverse proxies in the `X-Forwarded-For` chain |
-| `PUBLIC_CF_ANALYTICS_TOKEN` | no | — | Cloudflare Web Analytics token; leave unset to disable the beacon |
+| `BRAMBLE_MIGRATIONS_DIR` | no | `/app/migrations` (in the image) | Directory holding the SQL migration files |
 
 Migrations run automatically on first startup for the node target.
 

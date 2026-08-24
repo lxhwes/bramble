@@ -40,7 +40,7 @@ For Phase 0 we filter to names appearing ≥100 times in any year between 1995 a
 | Rate limiting | In-process fixed-window limiter in `src/hooks.server.ts` | Cloudflare edge WAF (dashboard-configured) | Same thresholds; node limiter is per-process |
 | Cron / pruning | `node build/prune.js` on a host cron (via `docker compose exec`) | Cloudflare Cron Trigger via `wrangler.toml` + `patch-worker.ts` | Both call the same `pruneInactiveSessions()` helper |
 | Backups | `sqlite3 .backup` host cron | D1 Time Travel (7-day PITR) | Same accepted-loss posture |
-| Web Analytics | Beacon skipped when `PUBLIC_CF_ANALYTICS_TOKEN` is unset | Cloudflare Web Analytics beacon (optional) | Token unset by default on self-host |
+| Web Analytics | None — no telemetry of any kind | Cloudflare Web Analytics, auto-injected by Pages | Self-host collects nothing; nothing to configure |
 | Client IP | `ADDRESS_HEADER` / `XFF_DEPTH` env vars | Cloudflare header, handled by edge | Needed for accurate rate-limit keying behind a reverse proxy |
 | Migrations | Auto-applied lazily on startup | `wrangler d1 migrations apply` + `patch-worker.ts` scheduled handler | Node target runs migrations on first boot |
 
@@ -137,9 +137,11 @@ For Cloudflare Pages projects, the `[triggers]` block in `wrangler.toml` is hono
 
 ## Web Analytics
 
-Cloudflare Web Analytics — first-party, cookie-less, free tier — is the only telemetry. Beacon snippet lives in `src/routes/+layout.svelte`'s `<svelte:head>`, gated on the optional `PUBLIC_CF_ANALYTICS_TOKEN` env var (`$env/dynamic/public`). When the variable is unset (local dev, PR previews, self-host), no beacon is rendered. The token is non-secret and is set in the Cloudflare Pages dashboard under Settings → Environment Variables.
+Cloudflare Web Analytics — first-party, cookie-less, free tier — is the only telemetry, and it runs on the hosted demo instance only. It is **injected by the Cloudflare Pages dashboard** (Settings → Web Analytics), not by application code. The app-side beacon snippet and its `PUBLIC_CF_ANALYTICS_TOKEN` env var were removed on 2026-05-12 so that auto-injection is the single source of truth and cannot double-count.
 
-No Google Analytics, no Plausible, no Sentry. The About page's "no third-party analytics" promise is enforceable because Cloudflare Web Analytics is first-party and reads no cookies.
+**Self-host collects no telemetry at all.** There is no beacon, no token, and nothing to configure or opt out of — the Node build has no analytics code path. The About page discloses analytics only on the Cloudflare build.
+
+No Google Analytics, no Plausible, no Sentry.
 
 ## Backup posture
 
