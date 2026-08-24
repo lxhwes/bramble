@@ -107,6 +107,8 @@ interface SeedRow {
 	sessionId: string;
 	partnerId: string;
 	latestVoteTs: number | null; // null → no votes for this session
+	/** Session creation time. Defaults to the epoch, i.e. "created long ago". */
+	createdAt?: number;
 }
 
 function seed(
@@ -114,17 +116,17 @@ function seed(
 	rows: SeedRow[],
 	kvStore?: Map<string, string>,
 ): void {
-	for (const { sessionId, partnerId, latestVoteTs } of rows) {
+	for (const { sessionId, partnerId, latestVoteTs, createdAt = 0 } of rows) {
 		// Mirror what createSession does, so the meta key is there to delete.
 		kvStore?.set(
 			sessionMetaKey(sessionId),
-			JSON.stringify({ createdAt: 0, partnerSlugs: ['alice'] }),
+			JSON.stringify({ createdAt, partnerSlugs: ['alice'] }),
 		);
 		sqlite
 			.prepare(
 				'INSERT INTO sessions (id, user_id, created_at) VALUES (?, NULL, ?)',
 			)
-			.run(sessionId, 0);
+			.run(sessionId, createdAt);
 		sqlite
 			.prepare(
 				'INSERT INTO partners (id, session_id, slug, created_at) VALUES (?, ?, ?, ?)',
@@ -438,6 +440,86 @@ describe('pruneInactiveSessions', () => {
 
 		expect(ops).toEqual([]);
 		expect(kvStore.has(sessionMetaKey('s-keep'))).toBe(true);
+	});
+
+	// -------------------------------------------------------------------------
+	// Voteless sessions age out; they are not born stale.
+	//
+	// "No votes at all" used to mean "prune now", regardless of age. The normal
+	// flow is: create a session, send the link, wait for the other person to
+	// join. If the nightly cron landed in that gap, the session was deleted
+	// minutes after being created and the shared link 404'd -- while the README,
+	// .env.example, and docker-compose.yml all promised a 90-day window.
+	// -------------------------------------------------------------------------
+
+	it('keeps a freshly created session that has no votes yet', async () => {
+		const sqlite = openWithAllMigrations();
+		const { storage, kvStore } = makeStorage(sqlite);
+		const now = Date.now();
+
+		seed(
+			sqlite,
+			[
+				{
+					sessionId: 's-fresh',
+					partnerId: 'p-fresh',
+					latestVoteTs: null,
+					createdAt: now - 60_000, // created a minute ago
+				},
+			],
+			kvStore,
+		);
+
+		const count = await pruneInactiveSessions(storage, now);
+
+		expect(count).toBe(0);
+		expect(
+			sqlite.prepare('SELECT id FROM sessions WHERE id = ?').get('s-fresh'),
+		).toBeDefined();
+		expect(kvStore.has(sessionMetaKey('s-fresh'))).toBe(true);
+	});
+
+	it('prunes a voteless session once it is older than the window', async () => {
+		const sqlite = openWithAllMigrations();
+		const { storage } = makeStorage(sqlite);
+		const now = Date.now();
+
+		seed(sqlite, [
+			{
+				sessionId: 's-stale-empty',
+				partnerId: 'p-stale-empty',
+				latestVoteTs: null,
+				createdAt: now - NINETY_DAYS_MS - 1000,
+			},
+		]);
+
+		const count = await pruneInactiveSessions(storage, now);
+
+		expect(count).toBe(1);
+		expect(
+			sqlite
+				.prepare('SELECT id FROM sessions WHERE id = ?')
+				.get('s-stale-empty'),
+		).toBeUndefined();
+	});
+
+	it('ages voteless sessions out against the retention override too', async () => {
+		const sqlite = openWithAllMigrations();
+		const { storage } = makeStorage(sqlite);
+		const now = Date.now();
+		const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+		seed(sqlite, [
+			{
+				sessionId: 's-2day-empty',
+				partnerId: 'p-2day-empty',
+				latestVoteTs: null,
+				createdAt: now - ONE_DAY_MS * 2,
+			},
+		]);
+
+		expect(await pruneInactiveSessions(storage, now)).toBe(0);
+		expect(await pruneInactiveSessions(storage, now, ONE_DAY_MS)).toBe(1);
 	});
 
 	it('respects an explicit retentionMs override', async () => {
