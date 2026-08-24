@@ -20,7 +20,7 @@ Existing name apps charge for the swipe-and-match feature, even though the under
 ## Features
 
 - Anonymous, URL-shared sessions — no signup, no accounts, no PII
-- ~10k names from SSA + Behind the Name
+- ~6,300 names from SSA + Behind the Name
 - Independent swiping with live mutual-match toasts
 - Filters: gender, era, popularity, starts-with letter (filter state survives reload)
 - Resume mid-deck, undo last 5 swipes, tap-to-vote alongside swipe + keyboard
@@ -40,12 +40,32 @@ The name dataset is preprocessed at build time into a static JSON blob — no ru
 
 ## Self-host
 
+One container and one SQLite file on a named volume. No Cloudflare account, no external services.
+
+### Prerequisites
+
+- Docker Engine 24 or newer
+- Docker Compose v2.24 or newer — check with `docker compose version`. The compose file uses `env_file:` with `required: false`, which older releases reject.
+
+### Quick start
+
 ```bash
+git clone https://github.com/lxhwes/bramble.git
+cd bramble
 docker compose up -d
-# App is available at http://localhost:3000
 ```
 
-### Environment variables
+Bramble is then on <http://localhost:3000>.
+
+The first build compiles `better-sqlite3` from source and takes a few minutes; later builds reuse the layer cache. There is no dataset step — `static/names.json` is committed. `pnpm build:names` exists only for regenerating it from the upstream sources, which self-hosting never requires.
+
+### Configuration
+
+Copy `.env.example` to `.env` and edit it. Everything set there reaches the container.
+
+For any deployment other than `http://localhost:3000`, **set `ORIGIN` to the URL people will actually visit**. Getting it wrong is the most common self-host problem — see [Troubleshooting](#troubleshooting).
+
+#### Environment variables
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
@@ -58,19 +78,89 @@ docker compose up -d
 | `XFF_DEPTH` | no | — | Number of trusted reverse proxies in the `X-Forwarded-For` chain |
 | `BRAMBLE_MIGRATIONS_DIR` | no | `/app/migrations` (in the image) | Directory holding the SQL migration files |
 
-Migrations run automatically on first startup for the node target.
+Migrations run automatically on the node target — lazily, on the first request after startup rather than at boot.
+
+### Running behind a reverse proxy
+
+Terminate TLS at the proxy and forward to the container. With Caddy:
+
+```caddy
+names.example.com {
+	reverse_proxy localhost:3000
+}
+```
+
+Then in `.env`:
+
+```bash
+ORIGIN=https://names.example.com
+ADDRESS_HEADER=X-Forwarded-For
+XFF_DEPTH=1
+```
+
+`XFF_DEPTH` is the number of proxies you control, counted from the right of the `X-Forwarded-For` chain: Caddy alone is `1`, Caddy behind Cloudflare is `2`. Without both variables the app sees the proxy's IP instead of the client's, and every visitor shares one rate-limit bucket.
+
+nginx needs `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` to build the same chain.
+
+### Backups
+
+The image ships the `sqlite3` CLI, so `.backup` can run against a live database (safe under WAL):
+
+```bash
+docker compose exec -T app sh -c 'sqlite3 "$BRAMBLE_DB_PATH" ".backup /data/backup.sqlite"'
+docker compose cp app:/data/backup.sqlite ./backup.sqlite
+```
+
+Keep that command single-quoted. Double quotes let the *host* shell expand `$BRAMBLE_DB_PATH`, which is only set inside the container. `sqlite3` then opens an empty temporary database and writes a backup file that looks valid and contains no tables.
+
+To restore: stop the container, put the file back into the volume as `bramble.sqlite`, start it again.
 
 ### Cron jobs
 
-Add these to the host's crontab (or equivalent). Both run against the container, so the SQLite file inside the `/data` volume is reachable:
+Add these to the host's crontab. Both run inside the container, so the SQLite file in the `/data` volume is reachable. Note that `%` must be backslash-escaped in crontab entries.
 
 ```bash
-# Prune sessions inactive for more than BRAMBLE_RETENTION_DAYS days — run daily
+# Prune sessions inactive for more than BRAMBLE_RETENTION_DAYS days — daily
 0 4 * * * docker compose -f /path/to/docker-compose.yml exec -T app node build/prune.js
 
-# SQLite backup — written into the /data volume (copy it off-box separately as needed)
-30 4 * * * docker compose -f /path/to/docker-compose.yml exec -T app sqlite3 "$BRAMBLE_DB_PATH" ".backup '/data/bramble-$(date +\%F).sqlite'"
+# Nightly backup into the /data volume — copy it off-box separately
+30 4 * * * docker compose -f /path/to/docker-compose.yml exec -T app sh -c 'sqlite3 "$BRAMBLE_DB_PATH" ".backup /data/bramble-$(date +\%F).sqlite"'
 ```
+
+### Upgrading
+
+Back up first, every time:
+
+```bash
+docker compose exec -T app sh -c 'sqlite3 "$BRAMBLE_DB_PATH" ".backup /data/pre-upgrade.sqlite"'
+git pull
+docker compose up -d --build
+```
+
+Migrations are forward-only and apply on the first request after the restart, so that first page load can be slightly slower than usual.
+
+`docker compose down` is safe. **`docker compose down -v` is not** — `-v` deletes the `bramble-data` volume and every session stored in it.
+
+### Troubleshooting
+
+**I can swipe, but I can't start a session.**
+`ORIGIN` doesn't match the origin the browser is using. adapter-node rejects cross-origin form POSTs, and session create plus shortlist add/remove are form POSTs. Voting is a JSON `fetch`, which the origin check does not cover, which is exactly why swiping keeps working. Set `ORIGIN` to the full public origin — scheme included, no trailing slash — then `docker compose up -d`.
+
+**Everyone gets 429s at once.**
+Behind a proxy without `ADDRESS_HEADER`, every request appears to come from the proxy, so all visitors share a single bucket: 5 session creates and 30 votes per minute for the whole site. See [Running behind a reverse proxy](#running-behind-a-reverse-proxy).
+
+**Is it actually healthy?**
+`GET /healthz` runs a real query against the database, and it is what the container's `HEALTHCHECK` probes — so `healthy` in `docker compose ps` means storage works, not merely that the process is up.
+
+```bash
+curl -s localhost:3000/healthz
+# {"status":"ok"}
+```
+
+A 503 means storage is unreachable, and the body carries the underlying error.
+
+**Writes fail with a 500, or the container never turns healthy.**
+Check `docker compose logs app`. An unwritable `/data` volume, a corrupt SQLite file, and a failed migration all surface there.
 
 ### Horizontal scaling caveat
 
@@ -80,16 +170,43 @@ The in-process rate limiter is per-process. If you run multiple replicas behind 
 
 ```bash
 pnpm install
-pnpm db:migrate:local  # apply D1 migrations to the local emulator (Cloudflare target)
-pnpm dev               # vite dev server (local KV + D1 via wrangler)
-pnpm check             # wrangler types + svelte-check (zero warnings)
-pnpm lint              # Biome
-pnpm test              # vitest
-pnpm build             # production build (BRAMBLE_TARGET=cloudflare by default)
-pnpm build:names       # regenerate static/names.json from data/ssa + data/btn
 ```
 
-The commands above run against the Cloudflare local emulator. To run the Node / self-host target locally, see the [Node setup in CONTRIBUTING.md](CONTRIBUTING.md#local-setup) (`BRAMBLE_TARGET=node pnpm build:node` + `node build/index.js`).
+### Node / self-host target
+
+The primary deployment path, so develop against it by default. `BRAMBLE_TARGET` is read at build time, which includes the dev server:
+
+```bash
+BRAMBLE_TARGET=node BRAMBLE_DB_PATH=./data/bramble.sqlite pnpm dev
+```
+
+Migrations apply to that SQLite file on the first request. For a production-shaped run instead of the dev server:
+
+```bash
+pnpm build:node
+BRAMBLE_DB_PATH=./data/bramble.sqlite ORIGIN=http://localhost:3000 PORT=3000 node build/index.js
+```
+
+### Cloudflare target
+
+Only needed when working on the hosted demo:
+
+```bash
+pnpm db:migrate:local  # apply D1 migrations to the local emulator
+pnpm dev               # Vite dev server with local KV + D1 via wrangler
+```
+
+### Quality gate
+
+```bash
+pnpm lint              # Biome
+pnpm check             # wrangler types + svelte-check (zero warnings)
+pnpm test              # Vitest
+pnpm build:cf          # both targets must stay green
+pnpm build:node
+```
+
+`pnpm build:names` regenerates `static/names.json` from the upstream sources — see [docs/DATA.md](docs/DATA.md). It is only needed when changing the dataset itself.
 
 PWA flows: test via `pnpm build && pnpm preview` (service worker registration is skipped in dev).
 
@@ -101,12 +218,14 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide. The short version: fo
 
 - [docs/ROADMAP.md](docs/ROADMAP.md) — phased plan
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — stack decisions
+- [docs/DATA.md](docs/DATA.md) — where the name dataset comes from and how to rebuild it
+- [docs/BRAND.md](docs/BRAND.md) — palette and icon regeneration
 - [docs/PHASE-1.6.md](docs/PHASE-1.6.md) — self-host target (in progress)
 - [docs/PHASE-0.md](docs/PHASE-0.md), [docs/PHASE-1.md](docs/PHASE-1.md), [docs/PHASE-1.5.md](docs/PHASE-1.5.md) — shipped phase scopes
 
 ## License
 
-App code: MIT — see [LICENSE](LICENSE).
-Bundled name dataset: CC BY-SA 4.0 (per Behind the Name attribution).
+- App code: MIT — see [LICENSE](LICENSE).
+- Bundled name dataset (`static/names.json`): CC BY-SA 4.0 — see [LICENSE-DATA.md](LICENSE-DATA.md).
 
-Name data sourced from the [US Social Security Administration](https://www.ssa.gov/oact/babynames/) (public domain) and [Behind the Name](https://www.behindthename.com/) (CC BY-SA 4.0). Attribution is rendered in-app on the About page.
+Name data comes from the [US Social Security Administration](https://www.ssa.gov/oact/babynames/) (public domain) and [Behind the Name](https://www.behindthename.com/) (CC BY-SA 4.0). Attribution is rendered in-app on the About page and ships beside the data at `/names.LICENSE.txt`. Share-alike is viral, so if you redistribute the dataset — including by publishing a container image — that attribution has to travel with it.

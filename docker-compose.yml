@@ -8,8 +8,10 @@
 #
 # Retention window is controlled by BRAMBLE_RETENTION_DAYS (default 90 days).
 #
-# SQLite backup (run from host, safe with WAL mode):
-#   docker compose exec app sqlite3 "$BRAMBLE_DB_PATH" ".backup '/data/backup-$(date +%F).sqlite'"
+# SQLite backup (run from host, safe with WAL mode). Single quotes matter:
+# BRAMBLE_DB_PATH is only set inside the container, so letting the host shell
+# expand it backs up an empty temporary database instead.
+#   docker compose exec -T app sh -c 'sqlite3 "$BRAMBLE_DB_PATH" ".backup /data/backup.sqlite"'
 
 services:
   app:
