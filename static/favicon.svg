@@ -1,7 +1,17 @@
-<!-- Placeholder. Replace once logo selection from logo-ideas.md is finalized. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-	<rect width="64" height="64" rx="14" fill="#FAF6F2"/>
-	<text x="32" y="46" text-anchor="middle"
-				font-family="DM Sans, system-ui, sans-serif"
-				font-weight="700" font-size="46" fill="#B44C3F">b</text>
+<!-- Bramble mark: a berry cluster on the coral field.
+     Also the render source for static/icons/*.png — see docs/BRAND.md. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Bramble">
+	<rect width="512" height="512" fill="#e8604c"/>
+	<!-- Mark drawn in a 100x100 space, scaled to 80% of the canvas and centred,
+	     which keeps every pixel inside the maskable safe circle (radius 40%). -->
+	<g transform="translate(51.2 43.3) scale(4.096)">
+		<path d="M50 36 L55 25" stroke="#ffd0c8" stroke-width="6" stroke-linecap="round"/>
+		<path d="M54 24 Q65 7 78 12 Q70 27 54 24 Z" fill="#ffd0c8"/>
+		<circle cx="25" cy="40" r="14" fill="#faf6f2"/>
+		<circle cx="50" cy="40" r="14" fill="#faf6f2"/>
+		<circle cx="75" cy="40" r="14" fill="#faf6f2"/>
+		<circle cx="37.5" cy="60" r="14" fill="#faf6f2"/>
+		<circle cx="62.5" cy="60" r="14" fill="#faf6f2"/>
+		<circle cx="50" cy="79" r="14" fill="#faf6f2"/>
+	</g>
 </svg>
