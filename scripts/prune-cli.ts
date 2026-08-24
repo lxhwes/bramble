@@ -22,6 +22,6 @@ import { pruneInactiveSessions } from '../src/lib/server/prune.js';
 import { getNodeStorage } from '../src/lib/server/storage/node.js';
 
 const storage = getNodeStorage();
-const count = await pruneInactiveSessions(storage.db, Date.now());
+const count = await pruneInactiveSessions(storage, Date.now());
 console.log(`[prune] pruned ${count} inactive session(s)`);
 process.exit(0);

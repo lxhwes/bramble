@@ -10,6 +10,7 @@
  */
 
 import { pruneInactiveSessions } from './prune.js';
+import { cloudflareStorage } from './storage/index.js';
 
 export async function scheduled(
 	_event: ScheduledEvent,
@@ -18,12 +19,16 @@ export async function scheduled(
 ): Promise<void> {
 	ctx.waitUntil(
 		(async () => {
-			const db = env.DB;
-			if (!db) {
-				console.warn('[prune] D1 binding DB not available; skipping');
+			// Both bindings are required: pruning clears KV session meta as well
+			// as the SQL rows.
+			if (!env.DB || !env.VOTES) {
+				console.warn('[prune] DB or VOTES binding not available; skipping');
 				return;
 			}
-			const count = await pruneInactiveSessions(db, Date.now());
+			const count = await pruneInactiveSessions(
+				cloudflareStorage(env),
+				Date.now(),
+			);
 			console.log(`[prune] pruned ${count} inactive session(s)`);
 		})(),
 	);

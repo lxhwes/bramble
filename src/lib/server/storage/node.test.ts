@@ -196,7 +196,7 @@ describe('pruneInactiveSessions with Node adapter', () => {
 				Date.now() - NINETY_DAYS_MS - 1000,
 			);
 
-		const count = await pruneInactiveSessions(storage.db, Date.now());
+		const count = await pruneInactiveSessions(storage, Date.now());
 		expect(count).toBe(1);
 
 		const row = raw.prepare('SELECT id FROM sessions WHERE id = ?').get(id);

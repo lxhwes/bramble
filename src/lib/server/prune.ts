@@ -5,11 +5,12 @@
  * considered inactive when its newest vote is older than the retention window,
  * or when it has no votes at all (orphan session).
  *
- * The public surface is intentionally minimal so the scheduled handler can
- * call it with only the D1 binding and a clock value.
+ * Takes the whole Storage rather than just the database because retention has
+ * to clear the KV session-meta key alongside the SQL rows; leaving it behind
+ * would keep a pruned session rendering as an empty session instead of a 404.
  */
 
-import type { BrambleDB } from './storage/types.js';
+import type { Storage } from './storage/types.js';
 
 const DEFAULT_RETENTION_DAYS = 90;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -45,10 +46,11 @@ function resolveRetentionMs(): number {
  * Returns the number of sessions deleted.
  */
 export async function pruneInactiveSessions(
-	db: BrambleDB,
+	storage: Storage,
 	nowMs: number,
 	retentionMs: number = resolveRetentionMs(),
 ): Promise<number> {
+	const db = storage.db;
 	const cutoff = nowMs - retentionMs;
 
 	// Identify sessions to delete: no vote newer than cutoff (or no votes at all).

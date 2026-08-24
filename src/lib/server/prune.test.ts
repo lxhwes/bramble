@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import { pruneInactiveSessions } from './prune.js';
-import type { BrambleDB } from './storage/types.js';
+import type { BrambleDB, BrambleKV, Storage } from './storage/types.js';
 
 // ---------------------------------------------------------------------------
 // Schema fixture
@@ -55,6 +55,37 @@ function makeD1Shim(sqlite: Database.Database): BrambleDB {
 }
 
 // ---------------------------------------------------------------------------
+// KV shim (Map-backed)
+// ---------------------------------------------------------------------------
+
+function makeKvShim(store = new Map<string, string>()): BrambleKV {
+	return {
+		async get<T>(key: string): Promise<T | null> {
+			const raw = store.get(key);
+			return raw === undefined ? null : (JSON.parse(raw) as T);
+		},
+		async put(key: string, value: string): Promise<void> {
+			store.set(key, value);
+		},
+		async delete(key: string): Promise<void> {
+			store.delete(key);
+		},
+	};
+}
+
+/** Assembles the Storage that pruneInactiveSessions now takes. */
+function makeStorage(sqlite: Database.Database): {
+	storage: Storage;
+	kvStore: Map<string, string>;
+} {
+	const kvStore = new Map<string, string>();
+	return {
+		storage: { db: makeD1Shim(sqlite), kv: makeKvShim(kvStore) },
+		kvStore,
+	};
+}
+
+// ---------------------------------------------------------------------------
 // Helpers: insert rows into the in-memory DB
 // ---------------------------------------------------------------------------
 
@@ -96,14 +127,14 @@ describe('pruneInactiveSessions', () => {
 
 	it('returns 0 when no sessions exist', async () => {
 		const sqlite = openWithAllMigrations();
-		const db = makeD1Shim(sqlite);
-		const count = await pruneInactiveSessions(db, Date.now());
+		const { storage } = makeStorage(sqlite);
+		const count = await pruneInactiveSessions(storage, Date.now());
 		expect(count).toBe(0);
 	});
 
 	it('does not prune a session whose last vote is within 90 days', async () => {
 		const sqlite = openWithAllMigrations();
-		const db = makeD1Shim(sqlite);
+		const { storage } = makeStorage(sqlite);
 		const now = Date.now();
 
 		seed(sqlite, [
@@ -114,7 +145,7 @@ describe('pruneInactiveSessions', () => {
 			},
 		]);
 
-		const count = await pruneInactiveSessions(db, now);
+		const count = await pruneInactiveSessions(storage, now);
 
 		expect(count).toBe(0);
 		const session = sqlite
@@ -125,7 +156,7 @@ describe('pruneInactiveSessions', () => {
 
 	it('prunes a session whose last vote is older than 90 days', async () => {
 		const sqlite = openWithAllMigrations();
-		const db = makeD1Shim(sqlite);
+		const { storage } = makeStorage(sqlite);
 		const now = Date.now();
 
 		seed(sqlite, [
@@ -136,7 +167,7 @@ describe('pruneInactiveSessions', () => {
 			},
 		]);
 
-		const count = await pruneInactiveSessions(db, now);
+		const count = await pruneInactiveSessions(storage, now);
 
 		expect(count).toBe(1);
 		const session = sqlite
@@ -147,7 +178,7 @@ describe('pruneInactiveSessions', () => {
 
 	it('cascades deletion to partners and votes', async () => {
 		const sqlite = openWithAllMigrations();
-		const db = makeD1Shim(sqlite);
+		const { storage } = makeStorage(sqlite);
 		const now = Date.now();
 
 		seed(sqlite, [
@@ -158,7 +189,7 @@ describe('pruneInactiveSessions', () => {
 			},
 		]);
 
-		await pruneInactiveSessions(db, now);
+		await pruneInactiveSessions(storage, now);
 
 		const partners = sqlite
 			.prepare('SELECT id FROM partners WHERE session_id = ?')
@@ -173,7 +204,7 @@ describe('pruneInactiveSessions', () => {
 
 	it('prunes shortlist rows for deleted sessions', async () => {
 		const sqlite = openWithAllMigrations();
-		const db = makeD1Shim(sqlite);
+		const { storage } = makeStorage(sqlite);
 		const now = Date.now();
 
 		seed(sqlite, [
@@ -191,7 +222,7 @@ describe('pruneInactiveSessions', () => {
 			)
 			.run('s-shortlist', 'Leo', 'M', 0);
 
-		await pruneInactiveSessions(db, now);
+		await pruneInactiveSessions(storage, now);
 
 		const shortlist = sqlite
 			.prepare('SELECT id FROM shortlists WHERE session_id = ?')
@@ -201,7 +232,7 @@ describe('pruneInactiveSessions', () => {
 
 	it('prunes orphan sessions (no votes at all)', async () => {
 		const sqlite = openWithAllMigrations();
-		const db = makeD1Shim(sqlite);
+		const { storage } = makeStorage(sqlite);
 		const now = Date.now();
 
 		// Session created long ago with no votes.
@@ -209,7 +240,7 @@ describe('pruneInactiveSessions', () => {
 			{ sessionId: 's-orphan', partnerId: 'p-orphan', latestVoteTs: null },
 		]);
 
-		const count = await pruneInactiveSessions(db, now);
+		const count = await pruneInactiveSessions(storage, now);
 
 		expect(count).toBe(1);
 		const session = sqlite
@@ -220,7 +251,7 @@ describe('pruneInactiveSessions', () => {
 
 	it('keeps recent sessions while pruning old ones in the same database', async () => {
 		const sqlite = openWithAllMigrations();
-		const db = makeD1Shim(sqlite);
+		const { storage } = makeStorage(sqlite);
 		const now = Date.now();
 
 		seed(sqlite, [
@@ -246,7 +277,7 @@ describe('pruneInactiveSessions', () => {
 			},
 		]);
 
-		const count = await pruneInactiveSessions(db, now);
+		const count = await pruneInactiveSessions(storage, now);
 
 		expect(count).toBe(3); // s-prune-1, s-prune-2, s-orphan
 
@@ -258,7 +289,7 @@ describe('pruneInactiveSessions', () => {
 
 	it('returns the count of pruned sessions, not rows', async () => {
 		const sqlite = openWithAllMigrations();
-		const db = makeD1Shim(sqlite);
+		const { storage } = makeStorage(sqlite);
 		const now = Date.now();
 
 		// Two sessions, both old.
@@ -275,13 +306,13 @@ describe('pruneInactiveSessions', () => {
 			},
 		]);
 
-		const count = await pruneInactiveSessions(db, now);
+		const count = await pruneInactiveSessions(storage, now);
 		expect(count).toBe(2);
 	});
 
 	it('respects an explicit retentionMs override', async () => {
 		const sqlite = openWithAllMigrations();
-		const db = makeD1Shim(sqlite);
+		const { storage } = makeStorage(sqlite);
 		const now = Date.now();
 		// Use a 1-day retention window.
 		const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -296,11 +327,11 @@ describe('pruneInactiveSessions', () => {
 		]);
 
 		// Default 90-day window: session is kept.
-		const countDefault = await pruneInactiveSessions(db, now);
+		const countDefault = await pruneInactiveSessions(storage, now);
 		expect(countDefault).toBe(0);
 
 		// Explicit 1-day window: session is pruned.
-		const countShort = await pruneInactiveSessions(db, now, ONE_DAY_MS);
+		const countShort = await pruneInactiveSessions(storage, now, ONE_DAY_MS);
 		expect(countShort).toBe(1);
 	});
 });

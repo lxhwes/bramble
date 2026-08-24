@@ -63,7 +63,13 @@ export interface SessionEnv {
 // Key helpers
 // ---------------------------------------------------------------------------
 
-function metaKey(sessionId: string): string {
+/**
+ * Key for a session's metadata blob.
+ *
+ * Exported because `prune.ts` deletes these keys for pruned sessions, and the
+ * two modules must not drift on the key format.
+ */
+export function sessionMetaKey(sessionId: string): string {
 	return `session:${sessionId}:meta`;
 }
 
@@ -106,7 +112,7 @@ export async function createSession(env: SessionEnv): Promise<string> {
 		createdAt: now,
 		partnerSlugs: [],
 	};
-	await env.kv.put(metaKey(sessionId), JSON.stringify(meta));
+	await env.kv.put(sessionMetaKey(sessionId), JSON.stringify(meta));
 
 	if (env.db !== null) {
 		const db = env.db;
@@ -130,7 +136,7 @@ export async function getSessionMeta(
 	env: SessionEnv,
 	sessionId: string,
 ): Promise<SessionMeta | null> {
-	return env.kv.get<SessionMeta>(metaKey(sessionId), 'json');
+	return env.kv.get<SessionMeta>(sessionMetaKey(sessionId), 'json');
 }
 
 /**
@@ -161,7 +167,7 @@ export async function addPartner(
 		return;
 	}
 	meta.partnerSlugs.push(slug);
-	await env.kv.put(metaKey(sessionId), JSON.stringify(meta));
+	await env.kv.put(sessionMetaKey(sessionId), JSON.stringify(meta));
 
 	if (env.db !== null) {
 		const db = env.db;
