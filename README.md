@@ -49,13 +49,24 @@ One container and one SQLite file on a named volume. No Cloudflare account, no e
 
 ### Quick start
 
+No clone and no build — grab the compose file and start it:
+
 ```bash
-git clone https://github.com/lxhwes/bramble.git
-cd bramble
+curl -O https://raw.githubusercontent.com/lxhwes/bramble/main/docker-compose.yml
 docker compose up -d
 ```
 
-Bramble is then on <http://localhost:3000>.
+Bramble is then on <http://localhost:3000>. Images are published to [GHCR](https://github.com/lxhwes/bramble/pkgs/container/bramble) for `linux/amd64` and `linux/arm64`.
+
+For anything you care about, pin a version rather than tracking `latest` — set `image: ghcr.io/lxhwes/bramble:0.1.0` in the compose file. Under 0.x a minor release may break compatibility, which is why there is deliberately no moving `:0` tag to follow.
+
+#### Building from source instead
+
+```bash
+git clone https://github.com/lxhwes/bramble.git
+cd bramble
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
 
 The first build compiles `better-sqlite3` from source and takes a few minutes; later builds reuse the layer cache. There is no dataset step — `static/names.json` is committed. `pnpm build:names` exists only for regenerating it from the upstream sources, which self-hosting never requires.
 
@@ -133,8 +144,15 @@ Back up first, every time:
 
 ```bash
 docker compose exec -T app sh -c 'sqlite3 "$BRAMBLE_DB_PATH" ".backup /data/pre-upgrade.sqlite"'
+docker compose pull
+docker compose up -d
+```
+
+Building from source instead:
+
+```bash
 git pull
-docker compose up -d --build
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 ```
 
 Migrations are forward-only and apply on the first request after the restart, so that first page load can be slightly slower than usual.

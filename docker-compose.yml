@@ -15,9 +15,13 @@
 
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    # Pin a version for a production deployment, e.g. ghcr.io/lxhwes/bramble:0.1.0
+    # Under 0.x a minor bump may break compatibility, so there is deliberately no
+    # moving `:0` tag to track.
+    #
+    # To build from source instead of pulling:
+    #   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+    image: ghcr.io/lxhwes/bramble:latest
     ports:
       - "${PORT:-3000}:3000"
     volumes:
