@@ -82,7 +82,27 @@ DoD:
 - `pnpm test` and `pnpm check` pass on both target builds; CI gates pull requests.
 - Repo is public with contributor essentials in place.
 
-> **Phases 2–4 are parked after 1.6.** They capture the long-term vision but carry no committed work. The project is intentionally small and "done for now" once self-host ships and the repo is public. Revisit only if real demand appears.
+## Phase 1.7 — Release and packaging (in progress since 2026-08-24)
+
+Goal: a stranger can run a specific, named version without cloning anything, and can tell what changed between versions.
+
+Phase 1.6 made self-hosting work but not *installable* — every self-hoster still cloned the repo and compiled `better-sqlite3` from source, with nothing to pin. 1.6 is scope-locked, so this is a separate phase. See `PHASE-1.7.md` for the task list.
+
+- Multi-architecture container images (`linux/amd64`, `linux/arm64`) published to GHCR on `v*` tag push, built on native runners rather than under QEMU.
+- `docker-compose.yml` pulls the published image; the build-from-source path moves to `docker-compose.build.yml`.
+- Docker build + runtime smoke test in CI, in parallel with the existing job. Build-only is not enough: `build/prune.js` broke in production twice without CI noticing.
+- `CHANGELOG.md` (Keep a Changelog) with an `### Upgrade notes` subsection, plus a `verify` job that fails a release whose tag disagrees with `package.json` or has no changelog section.
+- Dependabot for npm, GitHub Actions, and Docker. Covers the Node 20 EOL runner deadline listed under Phase 1.5.
+- LICENSE restored to pristine MIT (GitHub reported `other`); dataset terms move to `LICENSE-DATA.md`, and `static/names.LICENSE.txt` ships inside the image.
+
+DoD:
+- `docker compose up -d` works from a downloaded compose file — no clone, no local build.
+- `ghcr.io/lxhwes/bramble:0.1.0` runs on both amd64 and arm64.
+- A tag push publishes the image and then creates the GitHub release, in that order.
+- CI fails if the image does not boot, cannot write to `/data`, or cannot run `node build/prune.js`.
+- `gh api repos/lxhwes/bramble --jq .license.key` returns `mit`.
+
+> **Phases 2–4 are parked after 1.7.** They capture the long-term vision but carry no committed work. The project is intentionally small and "done for now" once self-host ships and the repo is public. Revisit only if real demand appears.
 
 ## Phase 2 — Feature Parity with Free Nameberry
 

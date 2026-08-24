@@ -70,6 +70,30 @@ CI runs the same gate on every pull request. A broken `main` means broken produc
 - Server-only logic lives in `src/lib/server/`. Nothing in there may be imported by client code.
 - No new runtime dependencies without flagging them in your PR description and explaining why the standard library or an existing dependency won't do. Build-time dependencies are fine.
 
+## Releasing
+
+Maintainer only. Tagging is what publishes the image, so the tag has to agree
+with the repo before it is pushed — the `verify` job in `.github/workflows/release.yml`
+fails the release otherwise.
+
+1. Bump `version` in `package.json`.
+2. Move the `## [Unreleased]` items into a new `## [x.y.z] - YYYY-MM-DD` section
+   in `CHANGELOG.md`, and update the link references at the bottom. If the
+   release changes anything an operator must do before pulling, put it under
+   `### Upgrade notes` — for an app with a persistent volume, that is the most
+   valuable line in the release.
+3. Commit as `chore(release): x.y.z`.
+4. `git tag -a vx.y.z -m "vx.y.z"`
+5. `git push origin main --follow-tags`
+
+The tag push builds `linux/amd64` and `linux/arm64` on native runners, pushes
+both to GHCR, merges them into a manifest list, and then creates the GitHub
+release from the changelog section. The release is created last on purpose, so
+notes can never point at an image that was never published.
+
+A tag containing `-` (e.g. `v0.2.0-rc.1`) is treated as a prerelease and claims
+neither `latest` nor the `{{major}}.{{minor}}` alias.
+
 ## Reporting bugs and requesting features
 
 Use the issue templates. For security reports, see [SECURITY.md](SECURITY.md) — please don't open a public issue for those.
