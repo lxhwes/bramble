@@ -2,7 +2,9 @@
 
 Thanks for your interest. Bramble is a small, open-source baby-name swipe app for couples. This guide covers local setup, the quality gate, and commit conventions.
 
-Scope lives in `docs/ROADMAP.md` (phase-level) and `docs/PHASE-1.6.md` (the active task list). If a change doesn't map to a roadmap item, open an issue first.
+Bug fixes, documentation, and small self-contained improvements are welcome with no preamble — open a PR. For anything larger, or anything that changes how an existing feature behaves, open an issue first so we can agree on the approach before you spend time on it. `docs/ROADMAP.md` is where phase-level scope lives if you want to see what's planned.
+
+By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Local setup
 
@@ -12,7 +14,13 @@ Bramble has two build targets, selected by `BRAMBLE_TARGET` (default `cloudflare
 
 ```bash
 pnpm install
-BRAMBLE_TARGET=node pnpm build:node
+BRAMBLE_TARGET=node BRAMBLE_DB_PATH=./data/bramble.sqlite pnpm dev
+```
+
+`BRAMBLE_TARGET` is read at build time, and the dev server counts, so this gives you the SQLite code paths with hot reload. For a production-shaped run instead:
+
+```bash
+pnpm build:node   # sets BRAMBLE_TARGET=node itself
 BRAMBLE_DB_PATH=./data/bramble.sqlite ORIGIN=http://localhost:3000 PORT=3000 node build/index.js
 ```
 
@@ -51,7 +59,7 @@ CI runs the same gate on every pull request. A broken `main` means broken produc
 
 ## Commit conventions
 
-- Conventional Commits: `type(scope): description` — types are `feat`, `fix`, `docs`, `test`, `refactor`, `chore`, `style`.
+- Conventional Commits: `type(scope): description` — types are `feat`, `fix`, `docs`, `test`, `refactor`, `chore`, `style`, `ci`, `build`.
 - One concern per commit. Small commits beat clever ones.
 - For bug fixes, include a test that fails without the fix.
 - `test(scope):` commits come before the `feat(scope):` they cover (TDD).
@@ -64,4 +72,4 @@ CI runs the same gate on every pull request. A broken `main` means broken produc
 
 ## Reporting bugs and requesting features
 
-Use the issue templates. For security reports, see `SECURITY.md`.
+Use the issue templates. For security reports, see [SECURITY.md](SECURITY.md) — please don't open a public issue for those.
