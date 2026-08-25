@@ -14,9 +14,11 @@
  *
  * Usage: called automatically at the end of the `build:cf` npm script.
  *
- * NOTE: this snippet is a hand-maintained twin of src/lib/server/prune.ts and
- * src/lib/server/scheduled.ts. Nothing checks that the three agree — change one,
- * change all three, and eyeball the tail of _worker.js after `pnpm build:cf`.
+ * NOTE: the snippet below is a hand-maintained twin of the prune logic in
+ * src/lib/server/prune.ts, and it is the ONLY scheduled handler that reaches
+ * production — nothing imports a TypeScript version of it. Nothing checks that
+ * the two agree either: change one, change both, and eyeball the tail of
+ * _worker.js after `pnpm build:cf`.
  */
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';

@@ -125,7 +125,7 @@ Sessions and their votes are deleted after a configurable inactivity window (def
 
 - `pruneInactiveSessions(db, nowMs)` in `src/lib/server/prune.ts` deletes from `votes`/`partners`/`shortlists`/`sessions` for sessions whose newest vote is older than `BRAMBLE_RETENTION_DAYS` days, plus orphan sessions with no votes at all.
 - **Node target**: pruning runs as `node build/prune.js` on a host cron — typically `docker compose exec -T app node build/prune.js`. `scripts/prune-cli.ts` is the source; `scripts/bundle-prune.ts` compiles it to `build/prune.js` during `build:node` so the runtime image needs no `tsx`/`pnpm`/`scripts/`. Daily granularity is fine for a 90-day window; being off by one day is inconsequential.
-- **Cloudflare target**: `src/lib/server/scheduled.ts` is the Cloudflare scheduled-event entry that calls the prune helper. The cron schedule lives in `wrangler.toml` `[triggers]`: `crons = ["0 4 * * *"]` — daily at 04:00 UTC.
+- **Cloudflare target**: the scheduled-event entry is the `SCHEDULED_SNIPPET` string in `scripts/patch-worker.ts`, appended to the generated `_worker.js` after the build (see below). It inlines its own copy of the prune SQL rather than importing `prune.ts`. The cron schedule lives in `wrangler.toml` `[triggers]`: `crons = ["0 4 * * *"]` — daily at 04:00 UTC.
 
 ### Why `scripts/patch-worker.ts` exists
 
