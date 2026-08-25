@@ -8,7 +8,11 @@ import {
 	appendVotes,
 	createSession,
 	getMatches,
+	getSessionMeta,
 	getVotes,
+	MAX_PARTNERS,
+	SessionFullError,
+	SessionNotFoundError,
 } from './sessions.js';
 import type { BrambleDB, BrambleKV } from './storage/types.js';
 
@@ -805,5 +809,97 @@ describe('sessions.ts — D1 read cutover (W2.2a)', () => {
 		expect(result.matches[0].name).toBe('Aaden');
 		expect(result.matches[0].sex).toBe('M');
 		expect(result.matches[0].superSlugs).toHaveLength(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Partner cap
+// ---------------------------------------------------------------------------
+
+describe('sessions.ts — partner cap', () => {
+	/** Fills a session to exactly MAX_PARTNERS distinct slugs. */
+	async function fillToCap(env: SessionEnv, id: string): Promise<void> {
+		for (let i = 0; i < MAX_PARTNERS; i++) {
+			await addPartner(env, id, `p${i}`);
+		}
+	}
+
+	it('addPartner accepts slugs up to the cap', async () => {
+		const { env } = kvAndDb();
+		const id = await createSession(env);
+
+		await expect(fillToCap(env, id)).resolves.toBeUndefined();
+
+		const meta = await getSessionMeta(env, id);
+		expect(meta?.partnerSlugs).toHaveLength(MAX_PARTNERS);
+	});
+
+	it('addPartner rejects a new slug past the cap', async () => {
+		const { env } = kvAndDb();
+		const id = await createSession(env);
+		await fillToCap(env, id);
+
+		await expect(addPartner(env, id, 'one-too-many')).rejects.toThrow(
+			SessionFullError,
+		);
+
+		const meta = await getSessionMeta(env, id);
+		expect(meta?.partnerSlugs).not.toContain('one-too-many');
+	});
+
+	it('an existing partner can still rejoin at the cap', async () => {
+		// The cap must not lock the people already in the session out of their
+		// own swipe page — rejoining is a plain GET on every page load.
+		const { env } = kvAndDb();
+		const id = await createSession(env);
+		await fillToCap(env, id);
+
+		await expect(addPartner(env, id, 'p0')).resolves.toBeUndefined();
+	});
+
+	it('the vote repair path stops minting partner rows past the cap', async () => {
+		const { env, rawDb } = kvAndDb();
+		const id = await createSession(env);
+		await fillToCap(env, id);
+
+		await expect(
+			appendVotes(env, id, 'uncapped', [makeVote('Aaden', 'M', 'yes')]),
+		).rejects.toThrow(SessionFullError);
+
+		const { n } = rawDb
+			.prepare('SELECT COUNT(*) AS n FROM partners WHERE session_id = ?')
+			.get(id) as { n: number };
+		expect(n).toBe(MAX_PARTNERS);
+	});
+
+	it('the vote repair path still repairs a known partner at the cap', async () => {
+		const { env, rawDb } = kvAndDb();
+		const id = await createSession(env);
+		await fillToCap(env, id);
+		rawDb.prepare('DELETE FROM partners WHERE session_id = ?').run(id);
+
+		await expect(
+			appendVotes(env, id, 'p0', [makeVote('Aaden', 'M', 'yes')]),
+		).resolves.toBeUndefined();
+
+		const stored = await getVotes(env, id, 'p0');
+		expect(stored?.votes).toHaveLength(1);
+	});
+
+	it('addPartner throws SessionNotFoundError for an unknown session', async () => {
+		const { env } = kvAndDb();
+		await expect(addPartner(env, 'no-such-session', 'alex')).rejects.toThrow(
+			SessionNotFoundError,
+		);
+	});
+
+	it('appendVotes throws SessionNotFoundError for an unknown session', async () => {
+		// The vote route keys its 404 off this class, so the type is load-bearing.
+		const { env } = kvAndDb();
+		await expect(
+			appendVotes(env, 'no-such-session', 'alex', [
+				makeVote('Aaden', 'M', 'yes'),
+			]),
+		).rejects.toThrow(SessionNotFoundError);
 	});
 });

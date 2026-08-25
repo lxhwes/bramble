@@ -59,6 +59,33 @@ export interface PartnerVotes {
  */
 export type SessionEnv = Storage;
 
+/**
+ * Maximum distinct partner slugs per session.
+ *
+ * A slug enters the session from a plain `GET /s/{id}?p={slug}` and nothing
+ * removes it, so without a bound the meta blob grows on every new slug, every
+ * page load fans out one `getVotes` per slug, and on Cloudflare the whole blob
+ * is rewritten each time. Eight is well past what the UI is built for (two
+ * people, occasionally a family) and low enough that the fan-out stays cheap.
+ */
+export const MAX_PARTNERS = 8;
+
+/** Thrown when an operation names a session that has no metadata in KV. */
+export class SessionNotFoundError extends Error {
+	constructor(sessionId: string) {
+		super(`Session not found: ${sessionId}`);
+		this.name = 'SessionNotFoundError';
+	}
+}
+
+/** Thrown when a session already holds `MAX_PARTNERS` distinct slugs. */
+export class SessionFullError extends Error {
+	constructor(sessionId: string) {
+		super(`Session is full (max ${MAX_PARTNERS} partners): ${sessionId}`);
+		this.name = 'SessionFullError';
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Key helpers
 // ---------------------------------------------------------------------------
@@ -139,8 +166,13 @@ export async function getSessionMeta(
  * Adds a partner slug to the session's partnerSlugs list (idempotent).
  * Also shadow-writes a row to D1 `partners` (best-effort, INSERT OR IGNORE).
  *
- * Throws if the session does not exist — callers must create the session
- * before adding partners so we never silently create orphaned partner records.
+ * Throws `SessionNotFoundError` if the session does not exist — callers must
+ * create the session before adding partners so we never silently create
+ * orphaned partner records.
+ *
+ * Throws `SessionFullError` once the session holds `MAX_PARTNERS` distinct
+ * slugs. Only a genuinely new slug is refused; an existing partner rejoining
+ * is always allowed, since that happens on every page load.
  */
 export async function addPartner(
 	env: SessionEnv,
@@ -149,7 +181,7 @@ export async function addPartner(
 ): Promise<void> {
 	const meta = await getSessionMeta(env, sessionId);
 	if (meta === null) {
-		throw new Error(`Session not found: ${sessionId}`);
+		throw new SessionNotFoundError(sessionId);
 	}
 	if (meta.partnerSlugs.includes(slug)) {
 		// Already registered in KV — nothing to do on KV, but still try D1
@@ -161,6 +193,11 @@ export async function addPartner(
 			);
 		}
 		return;
+	}
+	// Checked only for a slug that is genuinely new: the people already in the
+	// session re-run this on every page load and must never be locked out.
+	if (meta.partnerSlugs.length >= MAX_PARTNERS) {
+		throw new SessionFullError(sessionId);
 	}
 	meta.partnerSlugs.push(slug);
 	await env.kv.put(sessionMetaKey(sessionId), JSON.stringify(meta));
@@ -242,14 +279,17 @@ export async function getVotes(
  * used to mean votes were silently dropped; with SQL as the only store it would
  * be outright data loss on the swipe path, so the miss is repaired instead.
  *
- * The repair is bounded by requiring session meta to exist in KV — the same
- * invariant `addPartner` enforces. Without it an unauthenticated POST to an
- * arbitrary session id could mint rows.
+ * The repair is bounded twice over: session meta must exist in KV, and the
+ * session must hold fewer than `MAX_PARTNERS` partner rows. Without the first
+ * an unauthenticated POST to an arbitrary session id could mint rows; without
+ * the second a caller holding one session URL could mint unbounded distinct
+ * slugs, since the route's slug pattern admits far more than a session needs.
  *
  * Deliberately does not check `meta.partnerSlugs.includes(slug)`: KV is
  * eventually consistent on Cloudflare, so a vote landing in another colo may
- * not see the `addPartner` write yet, and rejecting would lose real votes. The
- * slug is already validated by the route.
+ * not see the `addPartner` write yet, and rejecting would lose real votes. That
+ * is also why the cap is counted in SQL rather than against the blob. The slug
+ * is already validated by the route.
  */
 async function resolvePartnerId(
 	env: SessionEnv,
@@ -268,7 +308,19 @@ async function resolvePartnerId(
 
 	const meta = await getSessionMeta(env, sessionId);
 	if (meta === null) {
-		throw new Error(`Session not found: ${sessionId}`);
+		throw new SessionNotFoundError(sessionId);
+	}
+
+	// Bound the repair by the same cap addPartner enforces, counted in SQL
+	// rather than against meta.partnerSlugs — a slug absent from the blob is
+	// exactly the eventually-consistent case this path exists to serve. Runs
+	// only after lookup() misses, so it stays off the hot vote path.
+	const partnerCount = await db
+		.prepare('SELECT COUNT(*) AS n FROM partners WHERE session_id = ?')
+		.bind(sessionId)
+		.first<{ n: number }>();
+	if ((partnerCount?.n ?? 0) >= MAX_PARTNERS) {
+		throw new SessionFullError(sessionId);
 	}
 
 	// The sessions row must exist first: FKs are enforced on both targets, so

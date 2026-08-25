@@ -1,5 +1,10 @@
 import { error } from '@sveltejs/kit';
-import { addPartner, getSessionMeta, getVotes } from '$lib/server/sessions';
+import {
+	addPartner,
+	getSessionMeta,
+	getVotes,
+	SessionFullError,
+} from '$lib/server/sessions';
 import { getStorage } from '$lib/server/storage';
 import {
 	LEGACY_COOKIE,
@@ -43,7 +48,19 @@ export const load: PageServerLoad = async ({
 		};
 	}
 
-	await addPartner(env, params.sessionId, slug);
+	try {
+		await addPartner(env, params.sessionId, slug);
+	} catch (err) {
+		// The session is full. This is a plain GET, so the alternative is a 500
+		// page on what is really a "no room" answer.
+		if (err instanceof SessionFullError) {
+			throw error(
+				409,
+				'This session already has the maximum number of partners',
+			);
+		}
+		throw err;
+	}
 
 	const nextEntries = upsertSession(
 		cookieEntries,
