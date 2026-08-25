@@ -175,7 +175,7 @@ curl -s localhost:3000/healthz
 # {"status":"ok"}
 ```
 
-A 503 means storage is unreachable, and the body carries the underlying error.
+A 503 means storage is unreachable, and the body is `{"status":"error"}`. The endpoint is unauthenticated, so the reason is kept out of the response — find it in `docker compose logs app`.
 
 **Writes fail with a 500, or the container never turns healthy.**
 Check `docker compose logs app`. An unwritable `/data` volume, a corrupt SQLite file, and a failed migration all surface there.

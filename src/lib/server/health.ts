@@ -26,6 +26,24 @@ export interface HealthResult {
 }
 
 /**
+ * The body `/healthz` puts on the wire.
+ *
+ * Deliberately drops `error`. The endpoint is unauthenticated and the reason
+ * is a raw storage message: SQLite failures embed the database path, so
+ * `unable to open database file: /data/bramble.sqlite` would be readable by
+ * anyone who can reach the probe. The reason still goes to the container log,
+ * which is where an operator debugging an unhealthy container is looking.
+ *
+ * Both outcomes share one shape, so a caller can parse the response without
+ * branching on which one it got.
+ */
+export function publicHealthBody(result: HealthResult): {
+	status: 'ok' | 'error';
+} {
+	return { status: result.ok ? 'ok' : 'error' };
+}
+
+/**
  * Runs a trivial read against storage.
  *
  * Never throws — a health probe that throws is indistinguishable from a server

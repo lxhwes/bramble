@@ -1,4 +1,4 @@
-import { checkStorage } from '$lib/server/health';
+import { checkStorage, publicHealthBody } from '$lib/server/health';
 import { getStorage } from '$lib/server/storage';
 import type { RequestHandler } from './$types';
 
@@ -21,10 +21,11 @@ export const GET: RequestHandler = async ({ platform }) => {
 	}
 
 	if (!result.ok) {
+		// The only place the reason is disclosed — see publicHealthBody.
 		console.error('[healthz] storage check failed:', result.error);
 	}
 
-	return new Response(JSON.stringify(result.ok ? { status: 'ok' } : result), {
+	return new Response(JSON.stringify(publicHealthBody(result)), {
 		status: result.ok ? 200 : 503,
 		headers: {
 			'content-type': 'application/json',

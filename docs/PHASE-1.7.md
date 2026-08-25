@@ -84,5 +84,3 @@ Recorded here rather than fixed:
   self-hosted instance is not fully self-contained offline.
 - The pnpm version `10.18.3` is pinned in four places (`Dockerfile`, `ci.yml`,
   `deploy.yml`, `engines`). A single `packageManager` field would collapse them.
-- `/healthz` returns `{"status":"ok"}` on success but `{"ok":false,"error":...}`
-  on failure. Two shapes for one endpoint.

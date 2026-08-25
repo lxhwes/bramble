@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
-import { checkStorage } from './health.js';
+import { checkStorage, publicHealthBody } from './health.js';
 import { runMigrations } from './storage/migrate.js';
 import { makeSqliteAdapter, makeSqliteKV } from './storage/node.js';
 import type { Storage } from './storage/types.js';
@@ -77,5 +77,35 @@ describe('checkStorage', () => {
 
 	it('does not throw on failure — it returns a result', async () => {
 		await expect(checkStorage(brokenStorage())).resolves.toBeDefined();
+	});
+});
+
+// ---------------------------------------------------------------------------
+// publicHealthBody
+// ---------------------------------------------------------------------------
+
+describe('publicHealthBody', () => {
+	it('reports ok for a healthy result', () => {
+		expect(publicHealthBody({ ok: true })).toEqual({ status: 'ok' });
+	});
+
+	it('reports error without the reason', () => {
+		// /healthz is unauthenticated. SQLite errors embed the database path, so
+		// the reason belongs in the container log, not on the wire.
+		const body = publicHealthBody({
+			ok: false,
+			error: 'unable to open database file: /data/bramble.sqlite',
+		});
+		expect(body).toEqual({ status: 'error' });
+		expect(JSON.stringify(body)).not.toContain('/data');
+		expect(JSON.stringify(body)).not.toContain('bramble.sqlite');
+	});
+
+	it('gives both outcomes the same shape', () => {
+		// One endpoint, one body shape — the probe used to answer {"status":"ok"}
+		// on success and {"ok":false,"error":...} on failure.
+		expect(Object.keys(publicHealthBody({ ok: true }))).toEqual(
+			Object.keys(publicHealthBody({ ok: false, error: 'boom' })),
+		);
 	});
 });
