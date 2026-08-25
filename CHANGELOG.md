@@ -75,6 +75,25 @@ First tagged release and first published container image.
   target.
 - `pnpm prune` silently ran pnpm's built-in dependency pruner rather than the
   retention script. The script is now `pnpm prune:node`.
+- Every match could vanish from a session. `getMatches` intersected the
+  liked-name sets of every slug in the session's partner list, and a slug with
+  no votes contributed an empty set — so a single visit to `/s/{id}?p={typo}`
+  emptied the match list, and nothing removed the slug again. Partners with no
+  votes are now ignored when intersecting.
+- A session's partner list was unbounded and grew from a `GET`. Any previously
+  unseen `?p=` value was appended, so the metadata blob grew without limit and
+  every page load fanned out one vote lookup per slug. Capped at 8; people
+  already in a session still rejoin freely.
+- A vote batch the server could never accept was retried for the life of the
+  tab. The route mapped every failure to a 500 and the client only dropped a
+  batch on success, so a tab left open on a pruned session replayed forever.
+  Unknown sessions now answer 404 and full sessions 409, and the client drops a
+  batch on any 4xx except 429.
+- `GET /healthz` disclosed the database path. On failure it echoed the
+  underlying error, and SQLite embeds the file path in its messages, so an
+  unauthenticated probe against a misconfigured instance revealed the
+  filesystem layout. The body is now `{"status":"error"}` and the reason goes
+  to the container log.
 
 ### Upgrade notes
 
