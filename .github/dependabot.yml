@@ -39,3 +39,12 @@ updates:
       interval: weekly
     commit-message:
       prefix: build
+    # Odd-numbered Node releases are never LTS and go end-of-life within
+    # months, which is the wrong footing for an image self-hosters pin. The
+    # first such offer, node 25, also failed outright: Node 25 dropped the
+    # bundled corepack the builder uses to install pnpm. LTS majors are
+    # deliberately still offered -- the smoke test is what makes a
+    # better-sqlite3 ABI break visible when one lands.
+    ignore:
+      - dependency-name: "node"
+        versions: ["23.x", "25.x", "27.x", "29.x", "31.x"]
