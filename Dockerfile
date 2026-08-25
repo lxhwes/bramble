@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # Builder — compiles better-sqlite3 native module and builds the Node server
 # ---------------------------------------------------------------------------
-FROM node:22-bookworm-slim AS builder
+FROM node:24-bookworm-slim AS builder
 
 # Build toolchain required for better-sqlite3's native C++ binding
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -18,7 +18,7 @@ RUN corepack enable && corepack prepare pnpm@10.18.3 --activate
 WORKDIR /app
 
 # Install dependencies before copying source so this layer is cache-friendly.
-# better-sqlite3 is compiled here against Node 22 / glibc (bookworm).
+# better-sqlite3 is compiled here against Node 24 / glibc (bookworm).
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
@@ -29,13 +29,13 @@ RUN BRAMBLE_TARGET=node pnpm build:node
 
 # Drop devDependencies so the copied node_modules contains only runtime deps.
 # The native better-sqlite3 .node binary remains valid because the runtime
-# stage uses the same base image (node:22-bookworm-slim, same glibc/ABI).
+# stage uses the same base image (node:24-bookworm-slim, same glibc/ABI).
 RUN pnpm prune --prod
 
 # ---------------------------------------------------------------------------
 # Runtime — minimal image; no build toolchain
 # ---------------------------------------------------------------------------
-FROM node:22-bookworm-slim AS runtime
+FROM node:24-bookworm-slim AS runtime
 
 # Static OCI metadata. The release workflow adds version/revision/created on
 # top via docker/metadata-action, which is why they are not hardcoded here.
