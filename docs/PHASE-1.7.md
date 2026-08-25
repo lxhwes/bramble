@@ -1,6 +1,6 @@
 # Phase 1.7 — Release and packaging
 
-Status: in progress since 2026-08-24
+Status: shipped 2026-08-25 (v0.1.0)
 
 Phase 1.6 made self-hosting work. It did not make it *installable*: every
 self-hoster still had to clone the repo and compile `better-sqlite3` from
@@ -76,11 +76,23 @@ anything, and can tell what changed between versions.
 
 ## Outstanding
 
-Recorded here rather than fixed:
+Everything still open is a GitHub issue; this section only links to them.
 
-- `static/og.png` is thin. Not referenced by the manifest, does not gate a
-  release.
-- Google Fonts are fetched from a third party in `src/app.html`, so a
-  self-hosted instance is not fully self-contained offline.
-- The pnpm version `10.18.3` is pinned in four places (`Dockerfile`, `ci.yml`,
-  `deploy.yml`, `engines`). A single `packageManager` field would collapse them.
+- **#17** — Google Fonts are fetched from a third party in `src/app.html`. Filed
+  after this phase closed and larger than the "not self-contained offline" note
+  it started as: the About page tells self-hosters the instance collects no
+  telemetry of any kind, while every page view contacts Google. Same class of
+  defect as the Cloudflare Analytics disclosure fixed in `07a8c39`.
+- **#20** — the prune logic is hand-duplicated between `prune.ts` and the
+  `SCHEDULED_SNIPPET` in `patch-worker.ts`, with no parity check.
+- **#22** — `getStorage`'s target branch is untested; `vitest.config.ts` defines
+  no `__BRAMBLE_TARGET__`.
+- **#30** — `static/og.png` is thin. Not referenced by the manifest, does not
+  gate a release.
+- **#31** — the pnpm version `10.18.3` is pinned in three places (`Dockerfile`,
+  `ci.yml`, `deploy.yml`); `package.json` `engines.pnpm` is a looser `>=10`. A
+  single `packageManager` field would collapse the three.
+
+Shipped after the tag, so not counted against this phase's DoD: the Node 24 LTS
+move, the Dependabot ignore rule that replaced a silently-broken one, and the OCI
+label fix. All three are in `CHANGELOG.md` under Unreleased.

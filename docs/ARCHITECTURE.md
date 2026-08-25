@@ -163,8 +163,16 @@ Bramble is personal-tool grade; swipe votes lose meaning shortly after a name de
 
 ### Self-host (primary)
 
-- `docker compose up -d` builds the Node image and starts a single container backed by a SQLite volume. Migrations run lazily on the first request; no separate migrate step.
+- `docker compose up -d` **pulls** `ghcr.io/lxhwes/bramble` and starts a single container backed by a SQLite volume. Migrations run lazily on the first request; no separate migrate step.
+- Building from source instead needs the second compose file: `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`. Compose builds rather than pulls when a service declares both `image:` and `build:` and the image is not local, so the build path had to move out of the base file to stop every `up` recompiling `better-sqlite3`. The override file is deliberately *not* named `docker-compose.override.yml`, which Compose auto-loads.
 - Required env: `ORIGIN` (adapter-node CSRF). See the README [Self-host](../README.md#self-host) section for the full env table and host cron jobs (prune + backup).
+
+### Release artifacts
+
+- Images are published to GHCR for `linux/amd64` and `linux/arm64` on a `v*` tag push, built on native runners. arm64 under QEMU takes 25–50 minutes for this image — the `better-sqlite3` amalgamation is a CPU-bound C compile — against roughly 90 seconds native. The two architectures build in parallel and are merged into a manifest list by digest.
+- Tags published: `{{version}}`, `{{major}}.{{minor}}`, `latest`, `sha-<short>`. A tag containing `-` (e.g. `v0.2.0-rc.1`) is treated as a prerelease and takes only `{{version}}` and `sha-<short>` — `release.yml` gates the other two on `!contains(github.ref, '-')`, so a prerelease never moves `latest`. There is deliberately no bare `{{major}}`: under 0.x a minor bump may break compatibility, so a moving `:0` tag would be actively harmful.
+- The GitHub release is created *after* the image is pushed, so release notes can never reference an image that was never published. Its body is extracted from the matching `CHANGELOG.md` section.
+- Free `ubuntu-24.04-arm` runners require a public repository. A private repo cannot run this pipeline.
 
 ### Cloudflare (the maintainer's host)
 

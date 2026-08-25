@@ -69,7 +69,7 @@ Effort is contained because D1 is SQLite under the hood, `better-sqlite3` is alr
 - Storage seam: thin `BrambleDB` / `BrambleKV` interfaces (strict subsets of D1/KV, so Cloudflare bindings satisfy them with zero wrapping). A `getStorage(event)` helper returns `{ db, kv }` on either target. Node impl backs onto `better-sqlite3` plus a `kv` table.
 - Converge the W2.2b dual-write: SQL is the source of truth on both targets, KV holds only `session:{id}:meta`. (Closes the half-migrated W2.2a state; the production soak window from 2026-05-05 has long elapsed.)
 - Adapter switch: `BRAMBLE_TARGET=node|cloudflare` picks `@sveltejs/adapter-node` or `@sveltejs/adapter-cloudflare` at build time. Default stays `cloudflare`. `better-sqlite3` is excluded from the Cloudflare bundle via dynamic import (native module).
-- Dockerfile (multi-stage `node:22-bookworm-slim` for the `better-sqlite3` native build) plus `docker-compose.yml` with a single service and a SQLite volume. Migrations run lazily on the first request inside `getNodeStorage()` — there is no separate migrate step at container start. Documented env vars including required `ORIGIN` (adapter-node CSRF on form POSTs).
+- Dockerfile (multi-stage `node:22-bookworm-slim` for the `better-sqlite3` native build; both stages moved to the Node 24 LTS line after v0.1.0) plus `docker-compose.yml` with a single service and a SQLite volume. Migrations run lazily on the first request inside `getNodeStorage()` — there is no separate migrate step at container start. Documented env vars including required `ORIGIN` (adapter-node CSRF on form POSTs).
 - Node-side equivalents for Cloudflare-only Phase 1.5 features: in-process fixed-window rate limiter in `hooks.server.ts` (replaces W3.4 WAF rules), a prune CLI (`scripts/prune-cli.ts`, bundled to `build/prune.js` so the container runs `node build/prune.js` with no `tsx`/`scripts/`) + documented host cron (replaces W3.3 Cron Trigger), conditional Web Analytics beacon already skipped on Node (W3.2), `sqlite3 .backup` host cron documented (replaces W3.7 Time Travel). Retention parameterized via `BRAMBLE_RETENTION_DAYS` (default 90).
 - Feature matrix in `ARCHITECTURE.md` recording Cloudflare-vs-Node behaviour for every Phase 1.5+ feature. New phases must fill it in.
 - README "Self-host" section, contributor essentials (CONTRIBUTING / CODE_OF_CONDUCT / SECURITY / templates / `.env.example`), CI test gate, real PWA icons, and a `history/PHASE-1.6.md` executable task list.
@@ -86,7 +86,7 @@ DoD met:
 
 Outstanding at handoff to 1.7: the repo visibility flip itself (W6.1) is a maintainer action, not a commit, and is sequenced after 1.7 because the release workflow's free arm64 runners require a public repo. Per-item deferrals are recorded in `history/PHASE-1.6.md`.
 
-## Phase 1.7 — Release and packaging (in progress since 2026-08-24)
+## Phase 1.7 — Release and packaging (shipped 2026-08-25)
 
 Goal: a stranger can run a specific, named version without cloning anything, and can tell what changed between versions.
 
@@ -99,12 +99,15 @@ Phase 1.6 made self-hosting work but not *installable* — every self-hoster sti
 - Dependabot for npm, GitHub Actions, and Docker. Covers the Node 20 EOL runner deadline listed under Phase 1.5.
 - LICENSE restored to pristine MIT (GitHub reported `other`); dataset terms move to `LICENSE-DATA.md`, and `static/names.LICENSE.txt` ships inside the image.
 
-DoD:
-- `docker compose up -d` works from a downloaded compose file — no clone, no local build.
-- `ghcr.io/lxhwes/bramble:0.1.0` runs on both amd64 and arm64.
-- A tag push publishes the image and then creates the GitHub release, in that order.
-- CI fails if the image does not boot, cannot write to `/data`, or cannot run `node build/prune.js`.
-- `gh api repos/lxhwes/bramble --jq .license.key` returns `mit`.
+DoD met:
+- `docker compose up -d` works from a downloaded compose file — no clone and no local build. Verified by pulling anonymously, with GHCR credentials removed, and running the documented quick start.
+- `ghcr.io/lxhwes/bramble:0.1.0` is published as a manifest list carrying `linux/amd64` and `linux/arm64`, and the smoke test passes against the pulled image.
+- A `v*` tag push publishes both architectures and then creates the GitHub release from the changelog section, in that order. Exercised on v0.1.0.
+- CI fails if the image does not boot, cannot reach storage, or cannot run `node build/prune.js`. It earned this immediately: the Node 25 bump passed every host-side check and was caught only by the container job.
+- `gh api repos/lxhwes/bramble --jq .license.key` returns `mit` — it reported `other` before the LICENSE split.
+- The repo is public, which is also what makes the free arm64 runners available.
+
+Outstanding at handoff: the published v0.1.0 image carries `licenses=MIT` rather than `MIT AND CC-BY-SA-4.0`, because `docker/metadata-action` overrides Dockerfile labels. Corrected for future releases, with a guard, rather than re-cutting a published tag — the dataset notice ships inside the image regardless. Remaining items are tracked as GitHub issues rather than here.
 
 > **Phases 2–4 are parked after 1.7.** They capture the long-term vision but carry no committed work. The project is intentionally small and "done for now" once self-host ships and the repo is public. Revisit only if real demand appears.
 
