@@ -58,10 +58,21 @@ jobs:
           platform="${{ matrix.platform }}"
           echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
 
+      # metadata-action derives OCI labels from repo metadata and passes them to
+      # build-push-action, where they override the Dockerfile's LABEL lines. Left
+      # to itself it derives `licenses` from GitHub's licence API, which reports
+      # MIT and knows nothing about the bundled dataset -- so v0.1.0 shipped
+      # claiming plain MIT while redistributing CC BY-SA data. It also takes
+      # `description` from the repo description, which is empty, and `title` from
+      # the repo name. Pin the three that have a correct answer of their own.
       - uses: docker/metadata-action@v5
         id: meta
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          labels: |
+            org.opencontainers.image.title=Bramble
+            org.opencontainers.image.description=Open-source baby-name swipe app for couples — swipe independently, find mutual matches.
+            org.opencontainers.image.licenses=MIT AND CC-BY-SA-4.0
 
       - uses: docker/setup-buildx-action@v3
 
@@ -139,6 +150,22 @@ jobs:
         run: |
           docker buildx imagetools inspect \
             "${REGISTRY}/${IMAGE_NAME}:${{ steps.meta.outputs.version }}"
+
+      # The published image redistributes the CC BY-SA dataset, so the licence
+      # label has to say so. This is a guard rather than a formality: v0.1.0
+      # shipped labelled plain MIT because metadata-action silently overrode the
+      # Dockerfile, and nothing noticed until the image was inspected by hand.
+      - name: Assert the dataset licence survived into the labels
+        run: |
+          image="${REGISTRY}/${IMAGE_NAME}:${{ steps.meta.outputs.version }}"
+          docker pull -q "$image"
+          got=$(docker inspect "$image" \
+            --format '{{index .Config.Labels "org.opencontainers.image.licenses"}}')
+          echo "org.opencontainers.image.licenses = ${got}"
+          case "$got" in
+            *CC-BY-SA-4.0*) echo "OK: dataset licence is declared." ;;
+            *) echo "::error::licences label lost the dataset terms: '${got}'"; exit 1 ;;
+          esac
 
   # Runs after the image exists, so release notes can never point at an image
   # that was never published.
