@@ -76,7 +76,7 @@ anything, and can tell what changed between versions.
 
 ## Outstanding
 
-Anything needing action is a GitHub issue now, not a bullet here:
+Everything still open is a GitHub issue; this section only links to them.
 
 - **#17** — Google Fonts are fetched from a third party in `src/app.html`. Filed
   after this phase closed and larger than the "not self-contained offline" note
@@ -87,13 +87,11 @@ Anything needing action is a GitHub issue now, not a bullet here:
   `SCHEDULED_SNIPPET` in `patch-worker.ts`, with no parity check.
 - **#22** — `getStorage`'s target branch is untested; `vitest.config.ts` defines
   no `__BRAMBLE_TARGET__`.
-
-Left as notes, since neither needs doing:
-
-- `static/og.png` is thin. Not referenced by the manifest, does not gate a
-  release.
-- The pnpm version `10.18.3` is pinned in four places (`Dockerfile`, `ci.yml`,
-  `deploy.yml`, `engines`). A single `packageManager` field would collapse them.
+- **#30** — `static/og.png` is thin. Not referenced by the manifest, does not
+  gate a release.
+- **#31** — the pnpm version `10.18.3` is pinned in three places (`Dockerfile`,
+  `ci.yml`, `deploy.yml`); `package.json` `engines.pnpm` is a looser `>=10`. A
+  single `packageManager` field would collapse the three.
 
 Shipped after the tag, so not counted against this phase's DoD: the Node 24 LTS
 move, the Dependabot ignore rule that replaced a silently-broken one, and the OCI

@@ -32,8 +32,9 @@ this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   labels from repository metadata and passes them to the build, where they
   override the Dockerfile's own. The three labels with a correct answer are now
   pinned, and the release fails if the dataset terms go missing from the
-  published artifact. This affected the `v0.1.0` image; the licence notice ships
-  inside the image either way, at `/names.LICENSE.txt`.
+  published artifact. This affected the `v0.1.0` image; the license notice ships
+  inside the image either way, at `/app/build/client/names.LICENSE.txt`, served
+  at `/names.LICENSE.txt`.
 - Dependabot went on offering non-LTS Node majors after being told not to. The
   first rule listed them as `versions: ["23.x", "25.x", ...]`, which never
   matched the Docker tag `25-bookworm-slim` — the suffix stops it parsing as a
