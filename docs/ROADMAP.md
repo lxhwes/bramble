@@ -121,7 +121,12 @@ Goal: a stranger arrives via Google for "Norse boy names," lands on a name detai
 - Couple style analysis: cluster joint likes by latent features (era, origin, sound, popularity); produce a 2–3 sentence summary via an LLM call. Equivalent to Nameberry's "Baby Name DNA."
 - Trending data surfaced from internal vote stream.
 
-(Multi-partner sessions already work at the URL level — `partnerSlugs: string[]` in KV meta and `getMatches` intersects across all partners. Not a Phase 2 deliverable; surface as a UX affordance only if a planned 3+ swiper experience justifies it.)
+(Multi-partner sessions already work at the URL level — `partnerSlugs: string[]` in KV meta, and `getMatches` intersects across every partner who has voted, capped at `MAX_PARTNERS`. Not a Phase 2 deliverable; surface as a UX affordance only if a planned 3+ swiper experience justifies it.)
+
+Carried in from the 1.7 review, not committed work:
+
+- **Move the join write out of `load` into a POST form action.** `addPartner` runs from a GET, so `/s/{id}?p={slug}` registers a partner on page load. A mistyped slug used to empty the session's match list permanently; that symptom is fixed and the roster is capped, but the root cause stands — an unconfirmed GET should not mutate the session, and a GET cannot be rate-limited by the existing POST-only rules in `hooks.server.ts`. The fix is a "join as ‹slug›?" confirmation on an unknown slug plus a matching rate-limit rule. Deferred because it changes the join UX.
+- **No way to remove a partner.** Once a slug is in `partnerSlugs` nothing takes it out short of retention. Worth an affordance if 3+ swiper sessions get surfaced.
 
 ## Phase 3 — Differentiation
 

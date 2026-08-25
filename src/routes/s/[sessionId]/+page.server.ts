@@ -74,6 +74,8 @@ export const load: PageServerLoad = async ({
 		COOKIE_OPTS,
 	);
 	// Dual-write the legacy cookie for one release; drop in a follow-up commit.
+	// See the note at the matching write in src/routes/+page.server.ts: the
+	// container smoke test reads this cookie and must move off it first.
 	cookies.set(LEGACY_COOKIE, params.sessionId, COOKIE_OPTS);
 
 	// addPartner is idempotent — the post-join slug list is the prior list
