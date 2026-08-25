@@ -387,8 +387,26 @@ export async function getMatches(
 		return { liked, supered, likeTs };
 	});
 
+	// Intersect across partners who have actually voted, not the whole roster.
+	//
+	// A slug enters partnerSlugs from a single GET /s/{id}?p={slug} and can never
+	// be removed, so a typo in a join link used to be enough to empty the match
+	// list for good: an empty liked set intersects to nothing. A partner who has
+	// not voted has expressed no opinion to intersect, so they sit the round out.
+	//
+	// The "needs two participants" rule still applies, now to the voters rather
+	// than the roster — otherwise one person's likes would surface as matches
+	// while their partner has yet to swipe.
+	const participants = likedSets
+		.map((sets, i) => ({ sets, slug: meta.partnerSlugs[i] }))
+		.filter(({ sets }) => sets.liked.size > 0);
+
+	if (participants.length < 2) {
+		return { partnerSlugs: meta.partnerSlugs, matches: [] };
+	}
+
 	// Intersect: start from the first set and keep only keys present in all.
-	const [first, ...rest] = likedSets;
+	const [first, ...rest] = participants.map((p) => p.sets);
 	const intersection = new Set<string>(
 		[...first.liked].filter((key) => rest.every((s) => s.liked.has(key))),
 	);
@@ -396,22 +414,26 @@ export async function getMatches(
 	const matches = [...intersection].map((key) => {
 		const [name, sex] = key.split('|');
 		// The key was constructed as `${name}|${'M'|'F'}` so sex is always valid.
-		const superSlugs = meta.partnerSlugs.filter((_, i) =>
-			likedSets[i].supered.has(key),
-		);
+		// Indices below are into `participants`, not the roster — a non-participant
+		// cannot have super-liked anything, since supered is a subset of liked.
+		const superSlugs = participants
+			.filter((p) => p.sets.supered.has(key))
+			.map((p) => p.slug);
 
-		// Per-partner yes/super timestamps for this match. The key is present in
-		// every partner's liked set (intersection), so likeTs.get is non-null.
-		const perPartnerTs = likedSets.map((s) => s.likeTs.get(key) as number);
+		// Per-participant yes/super timestamps for this match. The key is present
+		// in every participant's liked set (intersection), so likeTs.get is non-null.
+		const perPartnerTs = participants.map(
+			(p) => p.sets.likeTs.get(key) as number,
+		);
 		const firstMatchedAt = Math.max(...perPartnerTs);
 
-		// First liker = partner with lowest ts. Ties resolved by partnerSlugs
-		// order (Array#indexOf returns the first match), which mirrors meta order.
+		// First liker = participant with lowest ts. `participants` preserves
+		// partnerSlugs order, so ties still resolve in meta order.
 		let firstIdx = 0;
 		for (let i = 1; i < perPartnerTs.length; i++) {
 			if (perPartnerTs[i] < perPartnerTs[firstIdx]) firstIdx = i;
 		}
-		const firstLikedBy = meta.partnerSlugs[firstIdx];
+		const firstLikedBy = participants[firstIdx].slug;
 
 		return {
 			name,

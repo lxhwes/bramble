@@ -285,6 +285,64 @@ describe('sessions.ts — core behaviour', () => {
 		const result = await getMatches(env, id);
 		expect(result.matches).toHaveLength(0);
 	});
+
+	it('getMatches ignores a partner who has not voted', async () => {
+		const { env } = kvAndDb();
+		const id = await createSession(env);
+		await addPartner(env, id, 'alex');
+		await addPartner(env, id, 'laura');
+
+		await appendVotes(env, id, 'alex', [makeVote('Aaden', 'M', 'yes')]);
+		await appendVotes(env, id, 'laura', [makeVote('Aaden', 'M', 'yes')]);
+
+		// A third slug reaches partnerSlugs from a single GET /s/{id}?p=alx — a
+		// typo in the join link is enough. Intersecting across its empty vote set
+		// used to empty the match list permanently, with no way to undo in the app.
+		await addPartner(env, id, 'alx');
+
+		const result = await getMatches(env, id);
+		expect(result.matches).toHaveLength(1);
+		expect(result.matches[0].name).toBe('Aaden');
+		// The full roster is still reported — the UI lists who is in the session.
+		expect(result.partnerSlugs).toEqual(['alex', 'laura', 'alx']);
+	});
+
+	it('getMatches still returns nothing when only one partner has voted', async () => {
+		const { env } = kvAndDb();
+		const id = await createSession(env);
+		await addPartner(env, id, 'alex');
+		await addPartner(env, id, 'laura');
+
+		// laura has joined but not voted. Skipping no-vote partners must not
+		// promote alex's solo likes to matches.
+		await appendVotes(env, id, 'alex', [makeVote('Aaden', 'M', 'yes')]);
+
+		const result = await getMatches(env, id);
+		expect(result.matches).toHaveLength(0);
+	});
+
+	it('getMatches keeps superSlugs and firstLikedBy aligned when a no-vote partner is skipped', async () => {
+		const { env } = kvAndDb();
+		const id = await createSession(env);
+		// The silent slug sorts first in partnerSlugs, so a positional index into
+		// the unfiltered roster would attribute the wrong slug.
+		await addPartner(env, id, 'zzz');
+		await addPartner(env, id, 'alex');
+		await addPartner(env, id, 'laura');
+
+		await appendVotes(env, id, 'alex', [
+			{ name: 'Aaden', sex: 'M', vote: 'super', ts: 100 },
+		]);
+		await appendVotes(env, id, 'laura', [
+			{ name: 'Aaden', sex: 'M', vote: 'yes', ts: 500 },
+		]);
+
+		const result = await getMatches(env, id);
+		expect(result.matches).toHaveLength(1);
+		expect(result.matches[0].superSlugs).toEqual(['alex']);
+		expect(result.matches[0].firstLikedBy).toBe('alex');
+		expect(result.matches[0].firstMatchedAt).toBe(500);
+	});
 });
 
 // ---------------------------------------------------------------------------
