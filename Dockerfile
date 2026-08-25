@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # Builder — compiles better-sqlite3 native module and builds the Node server
 # ---------------------------------------------------------------------------
-FROM node:24-bookworm-slim AS builder
+FROM node:25-bookworm-slim AS builder
 
 # Build toolchain required for better-sqlite3's native C++ binding
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -35,7 +35,7 @@ RUN pnpm prune --prod
 # ---------------------------------------------------------------------------
 # Runtime — minimal image; no build toolchain
 # ---------------------------------------------------------------------------
-FROM node:24-bookworm-slim AS runtime
+FROM node:25-bookworm-slim AS runtime
 
 # Static OCI metadata. The release workflow adds version/revision/created on
 # top via docker/metadata-action, which is why they are not hardcoded here.
