@@ -39,12 +39,21 @@ updates:
       interval: weekly
     commit-message:
       prefix: build
-    # Odd-numbered Node releases are never LTS and go end-of-life within
-    # months, which is the wrong footing for an image self-hosters pin. The
-    # first such offer, node 25, also failed outright: Node 25 dropped the
-    # bundled corepack the builder uses to install pnpm. LTS majors are
-    # deliberately still offered -- the smoke test is what makes a
-    # better-sqlite3 ABI break visible when one lands.
+    # Base-image majors are a deliberate decision for an image self-hosters are
+    # told to pin, so they are not taken from a bot. Odd-numbered Node releases
+    # are never LTS at all; node 25 also broke the build outright by dropping
+    # the bundled corepack the builder uses to install pnpm.
+    #
+    # This deliberately blocks LTS majors too. An earlier attempt allowed them
+    # by listing the odd majors as `versions: ["25.x", ...]`, which silently
+    # does nothing: the Docker tag is `25-bookworm-slim`, and the suffix stops
+    # it matching a semver range. `update-types` is the mechanism that works
+    # here, and it cannot tell an LTS line from a non-LTS one.
+    #
+    # Nothing is lost by doing the jump by hand -- 22 -> 24 was done that way,
+    # and the CI smoke test is what proved the recompiled better-sqlite3 binary
+    # still worked. Note that `24-bookworm-slim` floats across 24.x, so patch
+    # and minor updates keep arriving via the base image itself.
     ignore:
       - dependency-name: "node"
-        versions: ["23.x", "25.x", "27.x", "29.x", "31.x"]
+        update-types: ["version-update:semver-major"]
