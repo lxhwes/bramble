@@ -1,6 +1,6 @@
 # Phase 1.6: Self-host target
 
-**Status:** shipped 2026-08-24, except W6.1 (the visibility flip), which is a maintainer action rather than a commit.
+**Status:** shipped 2026-08-24. W6.1, the visibility flip, completed 2026-08-25 — it is a maintainer action rather than a commit, and it was sequenced after Phase 1.7 because the release pipeline's free arm64 runners require a public repository.
 
 Release and packaging work — versioned images, changelog, release pipeline — is Phase 1.7, not this phase. This one was scope-locked.
 
@@ -135,7 +135,7 @@ Internally parallel.
 
 ## Wave 6 — Public flip
 
-### W6.1 — Flip repo public _pending — maintainer action_
+### W6.1 — Flip repo public _done 2026-08-25 — maintainer action, no commit_
 
 - Final serial gate: Wave 3 DoD met, CI green on both builds, hygiene + real icons done.
 - `gh secret-scanning` pass before flipping visibility.

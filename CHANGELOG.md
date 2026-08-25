@@ -15,6 +15,30 @@ this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- The container base image moved to the Node 24 LTS line, from Node 22. Both
+  Dockerfile stages move together by necessity: the runtime stage copies the
+  `better-sqlite3` binary the builder compiled, and that is only ABI-valid
+  because the two stages share a base image. CI and the Cloudflare deploy run
+  Node 24 as well, so tests no longer run on a different Node major than
+  production.
+- Fourteen grouped minor and patch dependency updates.
+
+### Fixed
+
+- The published image's `licenses` label read plain `MIT` while the image
+  redistributes the CC BY-SA name dataset. `docker/metadata-action` derives OCI
+  labels from repository metadata and passes them to the build, where they
+  override the Dockerfile's own. The three labels with a correct answer are now
+  pinned, and the release fails if the dataset terms go missing from the
+  published artifact. This affected the `v0.1.0` image; the licence notice ships
+  inside the image either way, at `/names.LICENSE.txt`.
+- Dependabot went on offering non-LTS Node majors after being told not to. The
+  first rule listed them as `versions: ["23.x", "25.x", ...]`, which never
+  matched the Docker tag `25-bookworm-slim` — the suffix stops it parsing as a
+  semver range — and failed silently, with no config error.
+
 ## [0.1.0] - 2026-08-25
 
 First tagged release and first published container image.
