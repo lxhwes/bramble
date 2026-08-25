@@ -77,7 +77,7 @@ Goal: maintainer + spouse use Bramble daily without papercuts. Resume across rel
 ## Pre-Phase-1 housekeeping (do first, in two separate commits, parallelizable)
 
 - **Tests**: install Vitest as devDep. Add `pnpm test` script. Configure for `node` environment for now. Add a smoke test on `src/lib/server/sessions.ts` that exercises `createSession` → `addPartner` → `appendVotes` → `getMatches` against an in-memory KV mock. Commit: `test: vitest scaffold and sessions.ts smoke tests`.
-- **Docs**: fix `docs/ROADMAP.md` / `docs/PHASE-0.md` / `docs/ARCHITECTURE.md` references in `README.md` and `CLAUDE.md` to point at the root-level files. Add a row in CLAUDE.md "See" linking to `PHASE-1.md`. Commit: `docs: fix root-level doc cross-references`.
+- **Docs**: fix `docs/ROADMAP.md` / `docs/PHASE-0.md` / `docs/ARCHITECTURE.md` references in `README.md` and the project instructions to point at the root-level files. Commit: `docs: fix root-level doc cross-references`.
 
 ## Anti-tasks (NOT in Phase 1)
 

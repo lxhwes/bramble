@@ -31,6 +31,8 @@ export const actions: Actions = {
 		const next = upsertSession(entries, id, null, Date.now());
 		cookies.set(SESSIONS_COOKIE, serializeSessionsCookie(next), COOKIE_OPTS);
 		// Dual-write the legacy cookie for one release; drop in a follow-up commit.
+		// scripts/smoke-test.sh reads this cookie to get the session id — switch it
+		// to bramble_sessions or the 303 Location header in the same commit.
 		cookies.set(LEGACY_COOKIE, id, COOKIE_OPTS);
 		throw redirect(303, `/s/${id}`);
 	},

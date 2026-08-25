@@ -3,7 +3,6 @@
  *
  * Exports:
  *   - Row interfaces mirroring the D1 schema (migrations/0001_init.sql, 0002_shortlist.sql).
- *   - `getDb(platform)` — returns the D1Database bound as `DB`.
  *   - Shortlist helpers: addToShortlist, removeFromShortlist, getShortlist.
  *
  * No business logic lives here. This module is the boundary between
@@ -76,24 +75,6 @@ export interface Shortlist {
 	sex: 'M' | 'F';
 	/** Unix milliseconds. */
 	created_at: number;
-}
-
-// ---------------------------------------------------------------------------
-// Binding accessor
-// ---------------------------------------------------------------------------
-
-/**
- * Returns the D1Database bound to the `DB` environment variable.
- *
- * Pass `platform` directly from a SvelteKit load function or server handler:
- *   const db = getDb(platform);
- *
- * Throws if `platform` is undefined (i.e. when running in a non-Worker
- * environment such as a Node adapter or unit tests). Callers that run in
- * both environments should guard with a null-check before calling this.
- */
-export function getDb(platform: App.Platform): D1Database {
-	return platform.env.DB;
 }
 
 // ---------------------------------------------------------------------------

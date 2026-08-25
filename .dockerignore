@@ -21,7 +21,7 @@ data
 .DS_Store
 Thumbs.db
 
-# Claude Code per-developer config
+# Per-developer agent/editor config
 .claude
 
 # Playwright CLI artifacts
@@ -30,3 +30,10 @@ Thumbs.db
 # Test and CI artifacts
 coverage
 *.log
+
+# Docs and CI config — the build never reads them, and excluding them keeps
+# documentation-only changes on a full layer-cache hit.
+# `*.md` matches root level only, which is why `docs` is listed separately.
+docs
+.github
+*.md

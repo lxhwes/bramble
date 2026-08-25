@@ -6,7 +6,7 @@ Goal: foundational work that's a precondition for inviting strangers — D1 migr
 
 ## Recommended wave (parallel, ship independently)
 
-Six items below touch disjoint files and can land in any order. Plan rationale lives in `~/.claude/plans/review-docs-roadmap-md-and-plan-glittery-perlis.md`.
+Six items below touch disjoint files and can land in any order.
 
 ### W1.1 — GH Actions runner deps bump `9789564`
 
@@ -111,7 +111,7 @@ Launch-readiness items. Disjoint files; can land in any order. All must merge be
 
 - New: `src/lib/components/Footer.svelte` (+ test), `src/routes/about/+page.svelte`.
 - Modify: `src/routes/+layout.svelte` — render `<Footer />` after children.
-- Closes the CLAUDE.md attribution gap: SSA + Behind the Name + CC BY-SA 4.0 now render in-app, not just README.
+- Closes the attribution gap: SSA + Behind the Name + CC BY-SA 4.0 now render in-app, not just README.
 - Shipped 2026-05-05.
 
 ### W3.1 — OpenGraph + Twitter card meta tags `d6171ee`
@@ -164,7 +164,7 @@ Launch-readiness items. Disjoint files; can land in any order. All must merge be
 
 ## Wave 4 — Match decision aids (shipped 2026-05-12)
 
-Lit up data the app was already collecting (vote timestamps, dataset metadata) to help couples actually pick a name out of their match list. All six items derived from existing D1/KV/dataset reads — no schema migration. Plan rationale lives in `~/.claude/plans/consider-the-current-state-nested-backus.md`.
+Lit up data the app was already collecting (vote timestamps, dataset metadata) to help couples actually pick a name out of their match list. All six items derived from existing D1/KV/dataset reads — no schema migration.
 
 ### W4.1 — Match recency in `getMatches` `8acf392` `606dc06`
 

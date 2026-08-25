@@ -67,7 +67,7 @@ CREATE INDEX IF NOT EXISTS idx_votes_partner_id ON votes (partner_id);
 -- ---------------------------------------------------------------------------
 -- Caches name attributes that are otherwise served from static/names.json.
 -- Populated by the build:names script if/when the maintainer decides to move
--- this data into D1 (deferred decision per PHASE-1.5.md).
+-- this data into D1 (deferred decision per docs/history/PHASE-1.5.md).
 CREATE TABLE IF NOT EXISTS name_meta (
 	name      TEXT NOT NULL,
 	sex       TEXT NOT NULL CHECK (sex IN ('M', 'F')),

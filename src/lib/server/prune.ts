@@ -3,13 +3,16 @@
  *
  * Implements the 90-day inactive-session retention policy.  A session is
  * considered inactive when its newest vote is older than the retention window,
- * or when it has no votes at all (orphan session).
+ * or -- for a session with no votes at all -- when it was created before that
+ * window opened.
  *
- * The public surface is intentionally minimal so the scheduled handler can
- * call it with only the D1 binding and a clock value.
+ * Takes the whole Storage rather than just the database because retention has
+ * to clear the KV session-meta key alongside the SQL rows; leaving it behind
+ * would keep a pruned session rendering as an empty session instead of a 404.
  */
 
-import type { BrambleDB } from './storage/types.js';
+import { sessionMetaKey } from './sessions.js';
+import type { Storage } from './storage/types.js';
 
 const DEFAULT_RETENTION_DAYS = 90;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -37,7 +40,8 @@ function resolveRetentionMs(): number {
  * The retention window defaults to `BRAMBLE_RETENTION_DAYS` env (90 days when
  * unset). Pass an explicit `retentionMs` to override — useful in tests.
  *
- * Sessions with no votes at all are treated as orphans and are also pruned.
+ * Sessions with no votes at all are pruned once they are older than the window,
+ * measured from `sessions.created_at`.
  *
  * Deletion order respects FK constraints:
  *   shortlists → votes → partners → sessions
@@ -45,14 +49,21 @@ function resolveRetentionMs(): number {
  * Returns the number of sessions deleted.
  */
 export async function pruneInactiveSessions(
-	db: BrambleDB,
+	storage: Storage,
 	nowMs: number,
 	retentionMs: number = resolveRetentionMs(),
 ): Promise<number> {
+	const db = storage.db;
 	const cutoff = nowMs - retentionMs;
 
-	// Identify sessions to delete: no vote newer than cutoff (or no votes at all).
-	// LEFT JOIN ensures orphan sessions (no partners / no votes) are included.
+	// Identify sessions to delete: no vote newer than cutoff, or no votes at all
+	// and created before the cutoff. The LEFT JOINs include sessions that have no
+	// partners or no votes.
+	//
+	// A voteless session falls back to created_at rather than being pruned on
+	// sight. The gap between "create a session" and "the other person votes" is
+	// the normal flow, not an orphan, and a nightly cron landing inside it used
+	// to delete a session minutes old.
 	const { results: stale } = await db
 		.prepare(
 			`
@@ -61,10 +72,10 @@ export async function pruneInactiveSessions(
 			LEFT JOIN partners p ON p.session_id = s.id
 			LEFT JOIN votes v ON v.partner_id = p.id
 			GROUP BY s.id
-			HAVING MAX(v.ts) IS NULL OR MAX(v.ts) < ?
+			HAVING MAX(v.ts) < ? OR (MAX(v.ts) IS NULL AND s.created_at < ?)
 		`,
 		)
-		.bind(cutoff)
+		.bind(cutoff, cutoff)
 		.all<{ id: string }>();
 
 	if (stale.length === 0) return 0;
@@ -72,6 +83,21 @@ export async function pruneInactiveSessions(
 	// Build a parameterised IN-clause for the stale session IDs.
 	const ids = stale.map((r) => r.id);
 	const placeholders = ids.map(() => '?').join(', ');
+
+	// Drop the KV session-meta blob before the SQL rows.
+	//
+	// Ordering is deliberate. session:{id}:meta is the key that makes /s/{id}
+	// resolve at all, so if KV succeeds and SQL then fails, the session reads as
+	// gone and the next run finishes the job. The reverse order leaves a session
+	// that still renders but has lost every vote — indistinguishable from data
+	// loss, and nothing ever cleans up the orphaned key.
+	//
+	// Sequential rather than batched: on Cloudflare each delete is a subrequest
+	// against a per-invocation cap, and a sequential loop makes partial progress
+	// instead of failing wholesale.
+	for (const id of ids) {
+		await storage.kv.delete(sessionMetaKey(id));
+	}
 
 	// Delete shortlist rows first (no FK to sessions, keyed by TEXT session_id).
 	await db

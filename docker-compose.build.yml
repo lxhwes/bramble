@@ -1,0 +1,17 @@
+# Build Bramble from source instead of pulling the published image.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+# Use this when you are developing against the container, or when you want to
+# run a commit that has not been released. The first build compiles
+# better-sqlite3 from source and takes a few minutes.
+#
+# This file is deliberately NOT named docker-compose.override.yml: Compose
+# auto-loads that name, which would silently turn every `docker compose up`
+# into a local rebuild.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile

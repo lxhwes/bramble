@@ -5,9 +5,10 @@
  * pruneInactiveSessions, logs the result, and exits 0.
  *
  * Usage:
- *   BRAMBLE_TARGET=node BRAMBLE_DB_PATH=/data/bramble.sqlite pnpm prune
+ *   BRAMBLE_DB_PATH=/data/bramble.sqlite pnpm prune:node
  *
- * Or via the package.json "prune" script which sets BRAMBLE_TARGET=node.
+ * The script name is "prune:node", not "prune", because `pnpm prune` is a
+ * built-in pnpm command (it prunes node_modules) and would shadow this one.
  *
  * Retention window: BRAMBLE_RETENTION_DAYS env (default 90). This is the same
  * env that the running server reads — set once, applies everywhere.
@@ -21,6 +22,6 @@ import { pruneInactiveSessions } from '../src/lib/server/prune.js';
 import { getNodeStorage } from '../src/lib/server/storage/node.js';
 
 const storage = getNodeStorage();
-const count = await pruneInactiveSessions(storage.db, Date.now());
+const count = await pruneInactiveSessions(storage, Date.now());
 console.log(`[prune] pruned ${count} inactive session(s)`);
 process.exit(0);

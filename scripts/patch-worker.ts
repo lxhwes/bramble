@@ -12,7 +12,13 @@
  *   the adapter.  Running this explicitly as a postbuild step (after `vite build`
  *   exits) guarantees the adapter has already written its output.
  *
- * Usage: called automatically via the `postbuild` npm script.
+ * Usage: called automatically at the end of the `build:cf` npm script.
+ *
+ * NOTE: the snippet below is a hand-maintained twin of the prune logic in
+ * src/lib/server/prune.ts, and it is the ONLY scheduled handler that reaches
+ * production — nothing imports a TypeScript version of it. Nothing checks that
+ * the two agree either: change one, change both, and eyeball the tail of
+ * _worker.js after `pnpm build:cf`.
  */
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -44,7 +50,7 @@ const SCHEDULED_SNIPPET = `
 
 const PRUNE_RETENTION_MS = ${RETENTION_MS};
 
-async function pruneInactiveSessions(db, nowMs) {
+async function pruneInactiveSessions(db, kv, nowMs) {
   const cutoff = nowMs - PRUNE_RETENTION_MS;
   const { results: stale } = await db
     .prepare(\`
@@ -53,15 +59,22 @@ async function pruneInactiveSessions(db, nowMs) {
       LEFT JOIN partners p ON p.session_id = s.id
       LEFT JOIN votes v ON v.partner_id = p.id
       GROUP BY s.id
-      HAVING MAX(v.ts) IS NULL OR MAX(v.ts) < ?
+      HAVING MAX(v.ts) < ? OR (MAX(v.ts) IS NULL AND s.created_at < ?)
     \`)
-    .bind(cutoff)
+    .bind(cutoff, cutoff)
     .all();
 
   if (stale.length === 0) return 0;
 
   const ids = stale.map((r) => r.id);
   const placeholders = ids.map(() => '?').join(', ');
+
+  // KV meta first — see the ordering rationale in src/lib/server/prune.ts.
+  // Sequential: each delete is a subrequest against a per-invocation cap, so a
+  // loop makes partial progress rather than failing wholesale.
+  for (const id of ids) {
+    await kv.delete(\`session:\${id}:meta\`);
+  }
 
   await db
     .prepare(\`DELETE FROM shortlists WHERE session_id IN (\${placeholders})\`)
@@ -79,12 +92,11 @@ async function pruneInactiveSessions(db, nowMs) {
 async function scheduled(_event, env, ctx) {
   ctx.waitUntil(
     (async () => {
-      const db = env.DB;
-      if (!db) {
-        console.warn('[prune] D1 binding DB not available; skipping');
+      if (!env.DB || !env.VOTES) {
+        console.warn('[prune] DB or VOTES binding not available; skipping');
         return;
       }
-      const count = await pruneInactiveSessions(db, Date.now());
+      const count = await pruneInactiveSessions(env.DB, env.VOTES, Date.now());
       console.log(\`[prune] pruned \${count} inactive session(s)\`);
     })(),
   );

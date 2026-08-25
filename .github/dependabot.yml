@@ -1,0 +1,41 @@
+version: 2
+
+# Minor and patch bumps are grouped into a single PR per ecosystem so a solo
+# maintainer gets one review, not fifteen. Majors stay separate — those are the
+# ones that need reading.
+#
+# Node major bumps are deliberately NOT ignored. The Dockerfile pins
+# node:22-bookworm-slim in two stages, and better-sqlite3's compiled binary is
+# only ABI-compatible because both stages match. A one-sided bump breaks the
+# image at runtime, which is exactly what the CI smoke test exists to catch.
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    commit-message:
+      prefix: build
+      prefix-development: chore
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    commit-message:
+      prefix: ci
+
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build

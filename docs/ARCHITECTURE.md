@@ -13,9 +13,11 @@ We may migrate to Astro at Phase 2 when per-name SEO pages become the dominant r
 
 ### Storage: SQLite everywhere, behind one seam
 
-The storage implementation is behind a `getStorage()` seam in `src/lib/server/storage/`. The Node target uses a `better-sqlite3` file (votes + a `kv` table). The Cloudflare target uses D1 for vote storage and KV for hot session state (deck cursor per partner, `slug → sessionId` lookup, session meta blob). Both are SQLite under the hood, so business-logic SQL is portable and the seam stays thin. `better-sqlite3` is excluded from the Cloudflare Worker bundle via build-time dead-code elimination.
+The storage implementation is behind a `getStorage()` seam in `src/lib/server/storage/`. The Node target uses a `better-sqlite3` file (votes + a `kv` table). The Cloudflare target uses D1 for votes and KV for the session meta blob. Both are SQLite under the hood, so business-logic SQL is portable and the seam stays thin. `better-sqlite3` is excluded from the Cloudflare Worker bundle via build-time dead-code elimination.
 
-D1 became the source of truth for vote reads in Phase 1.5 (W2.2a, 2026-05-05); Phase 0 ran KV-only. The KV `session:{id}:partner:{slug}` vote blob is still dual-written on both targets as a safety net — `appendVotes` writes it and `getVotes` falls back to it. Phase 1.6's W0.4 convergence will drop that write/read so KV holds only the `session:{id}:meta` blob; until W0.4 ships (its task in `PHASE-1.6.md` carries no commit hash yet), SQL is authoritative for reads but not yet the sole store.
+**SQL is the sole store for votes.** Phase 0 ran KV-only; D1 became the source of truth for reads in Phase 1.5 (W2.2a, 2026-05-05), with the KV `session:{id}:partner:{slug}` vote blob dual-written as a safety net. Phase 1.6's W0.4 dropped that write and the matching read fallback, so `session:{id}:meta` is now the only key the app reads or writes. Votes written to KV during the dual-write window are unreachable. They exist only on the maintainer's Cloudflare instance, which ran through that window, and are cleared there by a one-time manual `wrangler kv` sweep — `pruneInactiveSessions` deletes only `session:{id}:meta`, so nothing reclaims them automatically on either target. No self-hosted instance carries them: the Node target's first release (v0.1.0) postdates the cutover, so its `kv` table never held a vote blob. Sessions predating W2.1 were already accepted data loss at the read cutover.
+
+Because there is no second store to fall back on, `appendVotes` throws on a failed write rather than swallowing it. That is safe because the client keeps its batch on any non-2xx and retries, and `INSERT OR IGNORE` against `UNIQUE(partner_id, name, sex)` makes a replayed batch idempotent. `createSession` and `addPartner` remain best-effort; a missing partner row is repaired on the next vote.
 
 ### No auth
 
@@ -38,9 +40,9 @@ For Phase 0 we filter to names appearing ≥100 times in any year between 1995 a
 | Storage | `better-sqlite3` SQLite file + `kv` table | D1 (votes) + KV (hot session meta) | Both behind the `getStorage()` seam in `src/lib/server/storage/` |
 | Build adapter | `@sveltejs/adapter-node` | `@sveltejs/adapter-cloudflare` | Selected by `BRAMBLE_TARGET` in `svelte.config.js` |
 | Rate limiting | In-process fixed-window limiter in `src/hooks.server.ts` | Cloudflare edge WAF (dashboard-configured) | Same thresholds; node limiter is per-process |
-| Cron / pruning | `node build/prune.js` on a host cron (via `docker compose exec`) | Cloudflare Cron Trigger via `wrangler.toml` + `patch-worker.ts` | Both call the same `pruneInactiveSessions()` helper |
+| Cron / pruning | `node build/prune.js` on a host cron (via `docker compose exec`) | Cloudflare Cron Trigger via `wrangler.toml` + `patch-worker.ts` | Both clear the KV session-meta key before the SQL rows. The Cloudflare copy is a hand-maintained twin inside `patch-worker.ts`, not a shared import |
 | Backups | `sqlite3 .backup` host cron | D1 Time Travel (7-day PITR) | Same accepted-loss posture |
-| Web Analytics | Beacon skipped when `PUBLIC_CF_ANALYTICS_TOKEN` is unset | Cloudflare Web Analytics beacon (optional) | Token unset by default on self-host |
+| Web Analytics | None — no telemetry of any kind | Cloudflare Web Analytics, auto-injected by Pages | Self-host collects nothing; nothing to configure |
 | Client IP | `ADDRESS_HEADER` / `XFF_DEPTH` env vars | Cloudflare header, handled by edge | Needed for accurate rate-limit keying behind a reverse proxy |
 | Migrations | Auto-applied lazily on startup | `wrangler d1 migrations apply` + `patch-worker.ts` scheduled handler | Node target runs migrations on first boot |
 
@@ -67,7 +69,7 @@ votes (id, partner_id, name_slug, vote, created_at)
 shortlists (session_id, partner_slug, name_slug, added_at)  -- migration 0002
 ```
 
-The live tables are `sessions`, `partners`, `votes` (W1.6 + W2.1 + W2.2a) and `shortlists` (W2.4). KV continues to hold the hot deck cursor per partner and the `slug → sessionId` lookup.
+The live tables are `sessions`, `partners`, `votes` (W1.6 + W2.1 + W2.2a) and `shortlists` (W2.4). KV holds exactly one key, `session:{id}:meta` — the session's `createdAt` and its partner slugs. (Earlier revisions of this document also claimed a per-partner deck cursor and a `slug → sessionId` lookup in KV; neither was ever implemented. The deck position is client-side state.)
 
 Two tables in `migrations/0001_init.sql` are vestigial:
 - `users` — was the basis for the dropped W2.3 magic-link auth. Now unused; a future migration may drop it.
@@ -123,7 +125,7 @@ Sessions and their votes are deleted after a configurable inactivity window (def
 
 - `pruneInactiveSessions(db, nowMs)` in `src/lib/server/prune.ts` deletes from `votes`/`partners`/`shortlists`/`sessions` for sessions whose newest vote is older than `BRAMBLE_RETENTION_DAYS` days, plus orphan sessions with no votes at all.
 - **Node target**: pruning runs as `node build/prune.js` on a host cron — typically `docker compose exec -T app node build/prune.js`. `scripts/prune-cli.ts` is the source; `scripts/bundle-prune.ts` compiles it to `build/prune.js` during `build:node` so the runtime image needs no `tsx`/`pnpm`/`scripts/`. Daily granularity is fine for a 90-day window; being off by one day is inconsequential.
-- **Cloudflare target**: `src/lib/server/scheduled.ts` is the Cloudflare scheduled-event entry that calls the prune helper. The cron schedule lives in `wrangler.toml` `[triggers]`: `crons = ["0 4 * * *"]` — daily at 04:00 UTC.
+- **Cloudflare target**: the scheduled-event entry is the `SCHEDULED_SNIPPET` string in `scripts/patch-worker.ts`, appended to the generated `_worker.js` after the build (see below). It inlines its own copy of the prune SQL rather than importing `prune.ts`. The cron schedule lives in `wrangler.toml` `[triggers]`: `crons = ["0 4 * * *"]` — daily at 04:00 UTC.
 
 ### Why `scripts/patch-worker.ts` exists
 
@@ -137,9 +139,11 @@ For Cloudflare Pages projects, the `[triggers]` block in `wrangler.toml` is hono
 
 ## Web Analytics
 
-Cloudflare Web Analytics — first-party, cookie-less, free tier — is the only telemetry. Beacon snippet lives in `src/routes/+layout.svelte`'s `<svelte:head>`, gated on the optional `PUBLIC_CF_ANALYTICS_TOKEN` env var (`$env/dynamic/public`). When the variable is unset (local dev, PR previews, self-host), no beacon is rendered. The token is non-secret and is set in the Cloudflare Pages dashboard under Settings → Environment Variables.
+Cloudflare Web Analytics — first-party, cookie-less, free tier — is the only telemetry, and it runs on the hosted demo instance only. It is **injected by the Cloudflare Pages dashboard** (Settings → Web Analytics), not by application code. The app-side beacon snippet and its `PUBLIC_CF_ANALYTICS_TOKEN` env var were removed on 2026-05-12 so that auto-injection is the single source of truth and cannot double-count.
 
-No Google Analytics, no Plausible, no Sentry. The About page's "no third-party analytics" promise is enforceable because Cloudflare Web Analytics is first-party and reads no cookies.
+**Self-host collects no telemetry at all.** There is no beacon, no token, and nothing to configure or opt out of — the Node build has no analytics code path. The About page discloses analytics only on the Cloudflare build.
+
+No Google Analytics, no Plausible, no Sentry.
 
 ## Backup posture
 

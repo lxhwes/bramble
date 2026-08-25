@@ -1,3 +1,17 @@
+<script lang="ts">
+	// The data-handling disclosure has to describe the deployment the reader is
+	// actually looking at. Cloudflare Pages auto-injects a Web Analytics beacon
+	// on the maintainer's hosted demo; a self-hosted Node instance has no
+	// analytics code path at all, so claiming otherwise would be a false
+	// privacy disclosure published by the operator.
+	//
+	// __BRAMBLE_TARGET__ is a Vite build-time constant, so this resolves at
+	// build time. Note that both branches' markup still ships — Svelte compiles
+	// {#if} into template code that Rollup does not tree-shake — so this is a
+	// correctness measure, not a bundle-size one.
+	const isHostedDemo = __BRAMBLE_TARGET__ === 'cloudflare';
+</script>
+
 <svelte:head>
 	<title>About · Bramble</title>
 	<meta
@@ -55,14 +69,26 @@
 	<section class="space-y-3">
 		<h2 class="text-2xl font-semibold text-gray-900">What happens to your data</h2>
 		<ul class="list-disc space-y-2 pl-6 text-gray-700">
-			<li>A session lives in Cloudflare KV, keyed by a random session ID.</li>
+			{#if isHostedDemo}
+				<li>A session lives in Cloudflare's storage, keyed by a random session ID.</li>
+			{:else}
+				<li>A session lives in this instance's database, keyed by a random session ID.</li>
+			{/if}
 			<li>Your swipes are tied to whichever name you picked on the join screen.</li>
 			<li>No accounts, no email, no tracking pixels, no cross-site advertising.</li>
-			<li>
-				Bramble uses Cloudflare Web Analytics (cookie-less, no fingerprinting) to count anonymous
-				pageviews so I can tell whether anyone is using this thing.
-			</li>
-			<li>Sessions and their votes are automatically deleted after 90 days of inactivity.</li>
+			{#if isHostedDemo}
+				<li>
+					Bramble uses Cloudflare Web Analytics (cookie-less, no fingerprinting) to count anonymous
+					pageviews so I can tell whether anyone is using this thing.
+				</li>
+				<li>Sessions and their votes are automatically deleted after 90 days of inactivity.</li>
+			{:else}
+				<li>This instance collects no analytics and no telemetry of any kind.</li>
+				<li>
+					Sessions and their votes are automatically deleted after a period of inactivity set by
+					whoever runs this instance (90 days by default).
+				</li>
+			{/if}
 		</ul>
 	</section>
 
@@ -77,8 +103,11 @@
 	<section class="space-y-3">
 		<h2 class="text-2xl font-semibold text-gray-900">Open source</h2>
 		<p class="text-gray-700">
-			App code: MIT. Bundled name dataset: CC BY-SA 4.0. Source will be public once Phase 1 polish
-			lands.
+			App code: MIT. Bundled name dataset: CC BY-SA 4.0. The source is on
+			<a
+				href="https://github.com/lxhwes/bramble"
+				class="text-coral-700 underline hover:text-coral-800">GitHub</a
+			>, and you can run your own copy with Docker.
 		</p>
 	</section>
 </main>

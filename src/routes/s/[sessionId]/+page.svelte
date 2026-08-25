@@ -13,6 +13,7 @@
 		type NameEntry,
 	} from '$lib/filters';
 	import { SLUG_HTML_PATTERN, validateJoin } from '$lib/join-validation';
+	import { shouldDropBatch } from '$lib/vote-retry';
 
 	interface PendingVote {
 		name: string;
@@ -153,8 +154,10 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ slug: data.slug, votes: batch }),
 			});
-			if (res.ok) {
+			if (shouldDropBatch(res.status)) {
 				// Remove only the entries we sent, in case more arrived during the fetch.
+				// Dropped on success and on a permanent rejection alike — see
+				// vote-retry.ts for why a doomed batch must not be replayed forever.
 				pending = pending.slice(batch.length);
 			}
 		} catch {

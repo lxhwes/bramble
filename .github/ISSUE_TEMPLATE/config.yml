@@ -1,0 +1,10 @@
+blank_issues_enabled: true
+
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/lxhwes/bramble/security/advisories/new
+    about: Report privately through a GitHub security advisory. Please don't open a public issue for security problems.
+
+  - name: Questions and ideas
+    url: https://github.com/lxhwes/bramble/discussions
+    about: Ask a question or float an idea before it becomes an issue.

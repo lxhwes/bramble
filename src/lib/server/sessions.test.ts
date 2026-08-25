@@ -8,7 +8,11 @@ import {
 	appendVotes,
 	createSession,
 	getMatches,
+	getSessionMeta,
 	getVotes,
+	MAX_PARTNERS,
+	SessionFullError,
+	SessionNotFoundError,
 } from './sessions.js';
 import type { BrambleDB, BrambleKV } from './storage/types.js';
 
@@ -61,6 +65,10 @@ function openMockDb(): { db: BrambleDB; raw: Database.Database } {
 	);
 	const sql = readFileSync(migrationPath, 'utf8');
 	const raw = new Database(':memory:');
+	// Production enforces FKs on both targets (D1 by default, node.ts sets the
+	// pragma on the connection). The partner-repair path depends on the
+	// partners -> sessions constraint actually biting, so the fixture must match.
+	raw.pragma('foreign_keys = ON');
 	raw.exec(sql);
 
 	const db: BrambleDB = {
@@ -103,13 +111,12 @@ function makeVote(
 	return { name, sex, vote, ts: Date.now() };
 }
 
-/** Build a SessionEnv without a DB — for the existing KV-only tests. */
-function kvOnly(): { env: SessionEnv; rawKv: MockKV } {
-	const { kv, raw } = mockKv();
-	return { env: { kv, db: null }, rawKv: raw };
-}
-
-/** Build a SessionEnv with both KV and a BrambleDB — for parity tests. */
+/**
+ * Build a SessionEnv.
+ *
+ * There is no KV-only variant any more: SQL is the sole store for votes, so a
+ * SessionEnv without a database cannot serve a read.
+ */
 function kvAndDb(): {
 	env: SessionEnv;
 	rawKv: MockKV;
@@ -121,12 +128,12 @@ function kvAndDb(): {
 }
 
 // ---------------------------------------------------------------------------
-// Existing KV-only behaviour (unchanged by W2.1)
+// Core session/vote/match behaviour
 // ---------------------------------------------------------------------------
 
-describe('sessions.ts — KV behaviour', () => {
+describe('sessions.ts — core behaviour', () => {
 	it('createSession returns a UUID and writes meta with partnerSlugs:[] and numeric createdAt', async () => {
-		const { env, rawKv } = kvOnly();
+		const { env, rawKv } = kvAndDb();
 		const id = await createSession(env);
 
 		expect(typeof id).toBe('string');
@@ -145,7 +152,7 @@ describe('sessions.ts — KV behaviour', () => {
 	});
 
 	it('addPartner is idempotent — calling twice with the same slug yields partnerSlugs.length === 1', async () => {
-		const { env, rawKv } = kvOnly();
+		const { env, rawKv } = kvAndDb();
 		const id = await createSession(env);
 
 		await addPartner(env, id, 'alex');
@@ -160,14 +167,14 @@ describe('sessions.ts — KV behaviour', () => {
 	});
 
 	it('addPartner throws when called on a non-existent session', async () => {
-		const { env } = kvOnly();
+		const { env } = kvAndDb();
 		await expect(addPartner(env, 'no-such-session', 'alex')).rejects.toThrow(
 			'Session not found: no-such-session',
 		);
 	});
 
-	it('appendVotes accumulates — two calls of 2 votes each yields a 4-vote array', async () => {
-		const { env, rawKv } = kvOnly();
+	it('appendVotes accumulates — two calls of 2 votes each yields 4 votes', async () => {
+		const { env } = kvAndDb();
 		const id = await createSession(env);
 		await addPartner(env, id, 'alex');
 
@@ -183,15 +190,14 @@ describe('sessions.ts — KV behaviour', () => {
 		await appendVotes(env, id, 'alex', batch1);
 		await appendVotes(env, id, 'alex', batch2);
 
-		const stored = await rawKv.get<{ votes: VoteEntry[] }>(
-			`session:${id}:partner:alex`,
-			'json',
-		);
+		// Read back through the public API rather than the KV blob: SQL
+		// accumulates by INSERT, so there is no array to inspect.
+		const stored = await getVotes(env, id, 'alex');
 		expect(stored?.votes).toHaveLength(4);
 	});
 
 	it('getMatches returns the intersection of yes/super votes across partners', async () => {
-		const { env } = kvOnly();
+		const { env } = kvAndDb();
 		const id = await createSession(env);
 		await addPartner(env, id, 'alex');
 		await addPartner(env, id, 'laura');
@@ -219,7 +225,7 @@ describe('sessions.ts — KV behaviour', () => {
 	});
 
 	it('getMatches treats super as yes for matching purposes', async () => {
-		const { env } = kvOnly();
+		const { env } = kvAndDb();
 		const id = await createSession(env);
 		await addPartner(env, id, 'alex');
 		await addPartner(env, id, 'laura');
@@ -233,7 +239,7 @@ describe('sessions.ts — KV behaviour', () => {
 	});
 
 	it('getMatches lists the slug of a single partner who super-liked the match', async () => {
-		const { env } = kvOnly();
+		const { env } = kvAndDb();
 		const id = await createSession(env);
 		await addPartner(env, id, 'alex');
 		await addPartner(env, id, 'laura');
@@ -247,7 +253,7 @@ describe('sessions.ts — KV behaviour', () => {
 	});
 
 	it('getMatches lists every slug when all partners super-liked the match', async () => {
-		const { env } = kvOnly();
+		const { env } = kvAndDb();
 		const id = await createSession(env);
 		await addPartner(env, id, 'alex');
 		await addPartner(env, id, 'laura');
@@ -261,7 +267,7 @@ describe('sessions.ts — KV behaviour', () => {
 	});
 
 	it('getMatches returns superSlugs:[] when nobody super-liked the match', async () => {
-		const { env } = kvOnly();
+		const { env } = kvAndDb();
 		const id = await createSession(env);
 		await addPartner(env, id, 'alex');
 		await addPartner(env, id, 'laura');
@@ -274,7 +280,7 @@ describe('sessions.ts — KV behaviour', () => {
 	});
 
 	it('getMatches returns empty matches when there is only one partner', async () => {
-		const { env } = kvOnly();
+		const { env } = kvAndDb();
 		const id = await createSession(env);
 		await addPartner(env, id, 'alex');
 
@@ -282,6 +288,64 @@ describe('sessions.ts — KV behaviour', () => {
 
 		const result = await getMatches(env, id);
 		expect(result.matches).toHaveLength(0);
+	});
+
+	it('getMatches ignores a partner who has not voted', async () => {
+		const { env } = kvAndDb();
+		const id = await createSession(env);
+		await addPartner(env, id, 'alex');
+		await addPartner(env, id, 'laura');
+
+		await appendVotes(env, id, 'alex', [makeVote('Aaden', 'M', 'yes')]);
+		await appendVotes(env, id, 'laura', [makeVote('Aaden', 'M', 'yes')]);
+
+		// A third slug reaches partnerSlugs from a single GET /s/{id}?p=alx — a
+		// typo in the join link is enough. Intersecting across its empty vote set
+		// used to empty the match list permanently, with no way to undo in the app.
+		await addPartner(env, id, 'alx');
+
+		const result = await getMatches(env, id);
+		expect(result.matches).toHaveLength(1);
+		expect(result.matches[0].name).toBe('Aaden');
+		// The full roster is still reported — the UI lists who is in the session.
+		expect(result.partnerSlugs).toEqual(['alex', 'laura', 'alx']);
+	});
+
+	it('getMatches still returns nothing when only one partner has voted', async () => {
+		const { env } = kvAndDb();
+		const id = await createSession(env);
+		await addPartner(env, id, 'alex');
+		await addPartner(env, id, 'laura');
+
+		// laura has joined but not voted. Skipping no-vote partners must not
+		// promote alex's solo likes to matches.
+		await appendVotes(env, id, 'alex', [makeVote('Aaden', 'M', 'yes')]);
+
+		const result = await getMatches(env, id);
+		expect(result.matches).toHaveLength(0);
+	});
+
+	it('getMatches keeps superSlugs and firstLikedBy aligned when a no-vote partner is skipped', async () => {
+		const { env } = kvAndDb();
+		const id = await createSession(env);
+		// The silent slug sorts first in partnerSlugs, so a positional index into
+		// the unfiltered roster would attribute the wrong slug.
+		await addPartner(env, id, 'zzz');
+		await addPartner(env, id, 'alex');
+		await addPartner(env, id, 'laura');
+
+		await appendVotes(env, id, 'alex', [
+			{ name: 'Aaden', sex: 'M', vote: 'super', ts: 100 },
+		]);
+		await appendVotes(env, id, 'laura', [
+			{ name: 'Aaden', sex: 'M', vote: 'yes', ts: 500 },
+		]);
+
+		const result = await getMatches(env, id);
+		expect(result.matches).toHaveLength(1);
+		expect(result.matches[0].superSlugs).toEqual(['alex']);
+		expect(result.matches[0].firstLikedBy).toBe('alex');
+		expect(result.matches[0].firstMatchedAt).toBe(500);
 	});
 });
 
@@ -291,7 +355,7 @@ describe('sessions.ts — KV behaviour', () => {
 
 describe('getMatches — match decision aids', () => {
 	it('firstMatchedAt is the max of yes-or-super ts across partners (the moment the match crystallizes)', async () => {
-		const { env } = kvOnly();
+		const { env } = kvAndDb();
 		const id = await createSession(env);
 		await addPartner(env, id, 'alex');
 		await addPartner(env, id, 'laura');
@@ -309,7 +373,7 @@ describe('getMatches — match decision aids', () => {
 	});
 
 	it('firstLikedBy is the slug of the partner with the lowest yes-or-super ts', async () => {
-		const { env } = kvOnly();
+		const { env } = kvAndDb();
 		const id = await createSession(env);
 		await addPartner(env, id, 'alex');
 		await addPartner(env, id, 'laura');
@@ -327,7 +391,7 @@ describe('getMatches — match decision aids', () => {
 	});
 
 	it('firstLikedBy ties break by partnerSlugs order from session meta', async () => {
-		const { env } = kvOnly();
+		const { env } = kvAndDb();
 		const id = await createSession(env);
 		await addPartner(env, id, 'alex'); // added first → wins ties
 		await addPartner(env, id, 'laura');
@@ -367,7 +431,7 @@ describe('getMatches — match decision aids', () => {
 // D1 parity tests — KV stays canonical, D1 mirrors each write
 // ---------------------------------------------------------------------------
 
-describe('sessions.ts — D1 dual-write parity', () => {
+describe('sessions.ts — SQL writes', () => {
 	it('createSession inserts a row into D1 sessions', async () => {
 		const { env, rawDb } = kvAndDb();
 		const id = await createSession(env);
@@ -435,7 +499,7 @@ describe('sessions.ts — D1 dual-write parity', () => {
 		});
 	});
 
-	it('full flow — createSession → addPartner → appendVotes — KV and D1 both hold matching data', async () => {
+	it('full flow — createSession → addPartner → appendVotes — meta in KV, votes in SQL', async () => {
 		const { env, rawKv, rawDb } = kvAndDb();
 		const id = await createSession(env);
 		await addPartner(env, id, 'alex');
@@ -453,12 +517,6 @@ describe('sessions.ts — D1 dual-write parity', () => {
 			'json',
 		);
 		expect(kvMeta?.partnerSlugs).toEqual(['alex', 'laura']);
-
-		const kvVotes = await rawKv.get<{ votes: VoteEntry[] }>(
-			`session:${id}:partner:alex`,
-			'json',
-		);
-		expect(kvVotes?.votes).toHaveLength(2);
 
 		// Verify D1 session row
 		const sessionRow = rawDb
@@ -560,14 +618,128 @@ describe('sessions.ts — D1 dual-write parity', () => {
 			/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
 		);
 	});
+});
 
-	it('D1 null — all operations succeed when db is null (no D1 binding available)', async () => {
-		const { env } = kvOnly();
+// ---------------------------------------------------------------------------
+// SQL as the sole vote store (W0.4)
+//
+// appendVotes used to write the full vote array to KV as well, and getVotes
+// fell back to reading it when no database was present. Votes now live only in
+// SQL; KV holds session:{id}:meta and nothing else.
+// ---------------------------------------------------------------------------
+
+describe('sessions.ts — SQL is the sole vote store', () => {
+	it('appendVotes does not write a KV partner blob', async () => {
+		const { env, rawKv } = kvAndDb();
 		const id = await createSession(env);
 		await addPartner(env, id, 'alex');
 		await appendVotes(env, id, 'alex', [makeVote('Aaden', 'M', 'yes')]);
-		const result = await getMatches(env, id);
-		expect(result.matches).toHaveLength(0); // only one partner
+
+		const blob = await rawKv.get(`session:${id}:partner:alex`, 'json');
+		expect(blob).toBeNull();
+	});
+
+	it('getVotes ignores a pre-existing KV partner blob', async () => {
+		// A session from the dual-write era: votes in KV, nothing in SQL. The
+		// fallback is gone, so these are not readable.
+		const { env, rawKv } = kvAndDb();
+		const id = await createSession(env);
+		await addPartner(env, id, 'alex');
+		await rawKv.put(
+			`session:${id}:partner:alex`,
+			JSON.stringify({
+				votes: [makeVote('Ghost', 'F', 'yes')],
+				updatedAt: Date.now(),
+			}),
+		);
+
+		expect(await getVotes(env, id, 'alex')).toBeNull();
+	});
+
+	it('appendVotes propagates a SQL write failure', async () => {
+		// Swallowing this would mean silent, permanent vote loss now that there
+		// is no second store to fall back on.
+		const brokenDb: BrambleDB = {
+			prepare() {
+				const stmt = {
+					bind() {
+						return stmt;
+					},
+					run: () => Promise.reject(new Error('DB unavailable')),
+					first: () => Promise.reject(new Error('DB unavailable')),
+					all: () => Promise.reject(new Error('DB unavailable')),
+				};
+				return stmt;
+			},
+		};
+		const { kv } = mockKv();
+		const env: SessionEnv = { kv, db: brokenDb };
+		const id = await createSession(env);
+
+		await expect(
+			appendVotes(env, id, 'alex', [makeVote('Aaden', 'M', 'yes')]),
+		).rejects.toThrow();
+	});
+
+	it('appendVotes repairs a missing partner row', async () => {
+		const { env, rawDb } = kvAndDb();
+		const id = await createSession(env);
+		await addPartner(env, id, 'alex');
+		rawDb.prepare('DELETE FROM partners WHERE session_id = ?').run(id);
+
+		await appendVotes(env, id, 'alex', [makeVote('Aaden', 'M', 'yes')]);
+
+		const stored = await getVotes(env, id, 'alex');
+		expect(stored?.votes).toHaveLength(1);
+	});
+
+	it('appendVotes repairs a missing session row', async () => {
+		const { env, rawDb } = kvAndDb();
+		const id = await createSession(env);
+		await addPartner(env, id, 'alex');
+		// Cascades the partner row away too, so both inserts must be replayed.
+		rawDb.prepare('DELETE FROM sessions WHERE id = ?').run(id);
+
+		await appendVotes(env, id, 'alex', [makeVote('Aaden', 'M', 'yes')]);
+
+		const stored = await getVotes(env, id, 'alex');
+		expect(stored?.votes).toHaveLength(1);
+	});
+
+	it('a repaired session row keeps the original createdAt', async () => {
+		const { env, rawKv, rawDb } = kvAndDb();
+		const id = await createSession(env);
+		await addPartner(env, id, 'alex');
+		rawDb.prepare('DELETE FROM sessions WHERE id = ?').run(id);
+
+		await appendVotes(env, id, 'alex', [makeVote('Aaden', 'M', 'yes')]);
+
+		const meta = await rawKv.get<{ createdAt: number }>(
+			`session:${id}:meta`,
+			'json',
+		);
+		const row = rawDb
+			.prepare('SELECT created_at FROM sessions WHERE id = ?')
+			.get(id) as { created_at: number } | undefined;
+		expect(row?.created_at).toBe(meta?.createdAt);
+	});
+
+	it('appendVotes throws when the session is unknown', async () => {
+		// Bounds the repair: an unauthenticated POST to an arbitrary id must not
+		// mint session and partner rows.
+		const { env } = kvAndDb();
+		await expect(
+			appendVotes(env, 'no-such-session', 'alex', [
+				makeVote('Aaden', 'M', 'yes'),
+			]),
+		).rejects.toThrow('Session not found');
+	});
+
+	it('appendVotes is a no-op for an empty batch', async () => {
+		const { env } = kvAndDb();
+		await expect(
+			appendVotes(env, 'no-such-session', 'alex', []),
+		).resolves.toBeUndefined();
 	});
 });
 
@@ -637,5 +809,97 @@ describe('sessions.ts — D1 read cutover (W2.2a)', () => {
 		expect(result.matches[0].name).toBe('Aaden');
 		expect(result.matches[0].sex).toBe('M');
 		expect(result.matches[0].superSlugs).toHaveLength(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Partner cap
+// ---------------------------------------------------------------------------
+
+describe('sessions.ts — partner cap', () => {
+	/** Fills a session to exactly MAX_PARTNERS distinct slugs. */
+	async function fillToCap(env: SessionEnv, id: string): Promise<void> {
+		for (let i = 0; i < MAX_PARTNERS; i++) {
+			await addPartner(env, id, `p${i}`);
+		}
+	}
+
+	it('addPartner accepts slugs up to the cap', async () => {
+		const { env } = kvAndDb();
+		const id = await createSession(env);
+
+		await expect(fillToCap(env, id)).resolves.toBeUndefined();
+
+		const meta = await getSessionMeta(env, id);
+		expect(meta?.partnerSlugs).toHaveLength(MAX_PARTNERS);
+	});
+
+	it('addPartner rejects a new slug past the cap', async () => {
+		const { env } = kvAndDb();
+		const id = await createSession(env);
+		await fillToCap(env, id);
+
+		await expect(addPartner(env, id, 'one-too-many')).rejects.toThrow(
+			SessionFullError,
+		);
+
+		const meta = await getSessionMeta(env, id);
+		expect(meta?.partnerSlugs).not.toContain('one-too-many');
+	});
+
+	it('an existing partner can still rejoin at the cap', async () => {
+		// The cap must not lock the people already in the session out of their
+		// own swipe page — rejoining is a plain GET on every page load.
+		const { env } = kvAndDb();
+		const id = await createSession(env);
+		await fillToCap(env, id);
+
+		await expect(addPartner(env, id, 'p0')).resolves.toBeUndefined();
+	});
+
+	it('the vote repair path stops minting partner rows past the cap', async () => {
+		const { env, rawDb } = kvAndDb();
+		const id = await createSession(env);
+		await fillToCap(env, id);
+
+		await expect(
+			appendVotes(env, id, 'uncapped', [makeVote('Aaden', 'M', 'yes')]),
+		).rejects.toThrow(SessionFullError);
+
+		const { n } = rawDb
+			.prepare('SELECT COUNT(*) AS n FROM partners WHERE session_id = ?')
+			.get(id) as { n: number };
+		expect(n).toBe(MAX_PARTNERS);
+	});
+
+	it('the vote repair path still repairs a known partner at the cap', async () => {
+		const { env, rawDb } = kvAndDb();
+		const id = await createSession(env);
+		await fillToCap(env, id);
+		rawDb.prepare('DELETE FROM partners WHERE session_id = ?').run(id);
+
+		await expect(
+			appendVotes(env, id, 'p0', [makeVote('Aaden', 'M', 'yes')]),
+		).resolves.toBeUndefined();
+
+		const stored = await getVotes(env, id, 'p0');
+		expect(stored?.votes).toHaveLength(1);
+	});
+
+	it('addPartner throws SessionNotFoundError for an unknown session', async () => {
+		const { env } = kvAndDb();
+		await expect(addPartner(env, 'no-such-session', 'alex')).rejects.toThrow(
+			SessionNotFoundError,
+		);
+	});
+
+	it('appendVotes throws SessionNotFoundError for an unknown session', async () => {
+		// The vote route keys its 404 off this class, so the type is load-bearing.
+		const { env } = kvAndDb();
+		await expect(
+			appendVotes(env, 'no-such-session', 'alex', [
+				makeVote('Aaden', 'M', 'yes'),
+			]),
+		).rejects.toThrow(SessionNotFoundError);
 	});
 });

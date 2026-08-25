@@ -14,6 +14,22 @@
 
 import type { Storage } from './types.js';
 
+/**
+ * Wraps Cloudflare bindings as a Storage.
+ *
+ * Kept as its own export so the scheduled (cron) handler can build a Storage
+ * from `env` without a platform object — and so the double cast below lives at
+ * exactly one site rather than being copied into every caller.
+ */
+export function cloudflareStorage(env: Env): Storage {
+	return {
+		// D1Database and KVNamespace are strict supersets of BrambleDB/BrambleKV;
+		// plain assignment works because both interfaces are satisfied structurally.
+		db: env.DB as unknown as Storage['db'],
+		kv: env.VOTES as unknown as Storage['kv'],
+	};
+}
+
 export async function getStorage(
 	platform: App.Platform | undefined,
 ): Promise<Storage> {
@@ -22,10 +38,5 @@ export async function getStorage(
 		return getNodeStorage();
 	}
 	if (!platform) throw new Error('platform unavailable on cloudflare target');
-	return {
-		// D1Database and KVNamespace are strict supersets of BrambleDB/BrambleKV;
-		// plain assignment works because both interfaces are satisfied structurally.
-		db: platform.env.DB as unknown as Storage['db'],
-		kv: platform.env.VOTES as unknown as Storage['kv'],
-	};
+	return cloudflareStorage(platform.env);
 }

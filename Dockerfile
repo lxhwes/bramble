@@ -37,6 +37,17 @@ RUN pnpm prune --prod
 # ---------------------------------------------------------------------------
 FROM node:22-bookworm-slim AS runtime
 
+# Static OCI metadata. The release workflow adds version/revision/created on
+# top via docker/metadata-action, which is why they are not hardcoded here.
+#
+# `licenses` is an SPDX expression, not just the code license: the image
+# redistributes static/names.json, which is CC BY-SA 4.0. See LICENSE-DATA.md.
+LABEL org.opencontainers.image.title="Bramble" \
+      org.opencontainers.image.description="Open-source baby-name swipe app for couples — swipe independently, find mutual matches." \
+      org.opencontainers.image.source="https://github.com/lxhwes/bramble" \
+      org.opencontainers.image.documentation="https://github.com/lxhwes/bramble#self-host" \
+      org.opencontainers.image.licenses="MIT AND CC-BY-SA-4.0"
+
 # sqlite3 CLI only — supports the documented backup procedure.
 # No build toolchain: the native module is copied from builder (same ABI).
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -74,7 +85,10 @@ EXPOSE 3000
 # Persist the SQLite database across container restarts.
 VOLUME ["/data"]
 
+# Probe /healthz, not /. GET / only reads cookies, so it returned 200 with a
+# corrupt database, an unwritable /data volume, or a failed migration while
+# every write 500'd. /healthz runs a real query through getStorage().
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:'+process.env.PORT+'/', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))"
+    CMD node -e "require('http').get('http://localhost:'+process.env.PORT+'/healthz', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
 
 CMD ["node", "build/index.js"]

@@ -1,31 +1,34 @@
 /**
  * Session and vote storage.
  *
- * Key schema (KV — hot state, fallback when D1 unavailable):
- *   session:{sessionId}:meta           → SessionMeta
- *   session:{sessionId}:partner:{slug} → PartnerVotes
+ * Key schema (KV):
+ *   session:{sessionId}:meta → SessionMeta
  *
- * D1 (canonical read source when env.db is present):
+ * That is the only key the app reads or writes. Votes used to be mirrored to
+ * `session:{id}:partner:{slug}` as a safety net during the D1 cutover; that
+ * dual-write was removed in W0.4.
+ *
+ * SQL (the source of truth):
  *   sessions  — one row per createSession call
  *   partners  — one row per addPartner call
  *   votes     — one row per vote in appendVotes
  *
- * Read strategy: `getVotes` reads from D1 when `env.db !== null`; falls back
- * to KV otherwise (local dev, unit tests that omit the D1 fixture).
+ * Read/write strategy: votes are read from and written to SQL only.
  *
- * Write strategy: `appendVotes` still dual-writes to both KV and D1.  The KV
- * write will be removed once W2.2a has soaked in production for ~one week
- * (see W2.2b in PHASE-1.5.md).
+ * Failure semantics differ by operation, deliberately:
+ *   - `appendVotes` throws. With no second store, swallowing a write failure
+ *     would be silent, permanent vote loss. The client keeps the batch and
+ *     retries on any non-2xx, and UNIQUE(partner_id, name, sex) with
+ *     INSERT OR IGNORE makes a replayed batch idempotent.
+ *   - `createSession` and `addPartner` stay best-effort. Their rows are
+ *     reconstructed by the repair path in `appendVotes`, so failing a user's
+ *     session-create on a transient blip would cost more than it buys.
  *
- * API design: functions accept a `SessionEnv` object `{ kv, db }` rather than
- * a bare `KVNamespace`.  Callers pass `{ kv: platform.env.VOTES, db: platform.env.DB }`.
- * `db` is nullable so callers and tests can omit it when D1 is unavailable.
- *
- * D1 writes are best-effort: any failure is logged via console.warn and
- * swallowed.  A D1 failure must not break the swipe path.
+ * API design: functions accept a `SessionEnv` (an alias of `Storage`) rather
+ * than a bare KV namespace. Callers get one from `getStorage()`.
  */
 
-import type { BrambleDB, BrambleKV } from './storage/types.js';
+import type { BrambleDB, Storage } from './storage/types.js';
 
 export type Vote = 'yes' | 'no' | 'super';
 
@@ -48,27 +51,53 @@ export interface PartnerVotes {
 }
 
 /**
- * Combined storage environment for session operations.
+ * Storage environment for session operations.
  *
- * `db` is nullable so callers in environments where D1 is not wired up (local
- * dev without a real binding, unit tests that only exercise KV paths) can pass
- * `null` safely.
+ * An alias of `Storage` rather than a second definition that can drift. `db` is
+ * required: with SQL as the sole vote store there is no KV-only mode, so the
+ * compiler enforces the invariant instead of a runtime guard.
  */
-export interface SessionEnv {
-	kv: BrambleKV;
-	db: BrambleDB | null;
+export type SessionEnv = Storage;
+
+/**
+ * Maximum distinct partner slugs per session.
+ *
+ * A slug enters the session from a plain `GET /s/{id}?p={slug}` and nothing
+ * removes it, so without a bound the meta blob grows on every new slug, every
+ * page load fans out one `getVotes` per slug, and on Cloudflare the whole blob
+ * is rewritten each time. Eight is well past what the UI is built for (two
+ * people, occasionally a family) and low enough that the fan-out stays cheap.
+ */
+export const MAX_PARTNERS = 8;
+
+/** Thrown when an operation names a session that has no metadata in KV. */
+export class SessionNotFoundError extends Error {
+	constructor(sessionId: string) {
+		super(`Session not found: ${sessionId}`);
+		this.name = 'SessionNotFoundError';
+	}
+}
+
+/** Thrown when a session already holds `MAX_PARTNERS` distinct slugs. */
+export class SessionFullError extends Error {
+	constructor(sessionId: string) {
+		super(`Session is full (max ${MAX_PARTNERS} partners): ${sessionId}`);
+		this.name = 'SessionFullError';
+	}
 }
 
 // ---------------------------------------------------------------------------
 // Key helpers
 // ---------------------------------------------------------------------------
 
-function metaKey(sessionId: string): string {
+/**
+ * Key for a session's metadata blob.
+ *
+ * Exported because `prune.ts` deletes these keys for pruned sessions, and the
+ * two modules must not drift on the key format.
+ */
+export function sessionMetaKey(sessionId: string): string {
 	return `session:${sessionId}:meta`;
-}
-
-function partnerKey(sessionId: string, slug: string): string {
-	return `session:${sessionId}:partner:${slug}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -106,7 +135,7 @@ export async function createSession(env: SessionEnv): Promise<string> {
 		createdAt: now,
 		partnerSlugs: [],
 	};
-	await env.kv.put(metaKey(sessionId), JSON.stringify(meta));
+	await env.kv.put(sessionMetaKey(sessionId), JSON.stringify(meta));
 
 	if (env.db !== null) {
 		const db = env.db;
@@ -130,15 +159,20 @@ export async function getSessionMeta(
 	env: SessionEnv,
 	sessionId: string,
 ): Promise<SessionMeta | null> {
-	return env.kv.get<SessionMeta>(metaKey(sessionId), 'json');
+	return env.kv.get<SessionMeta>(sessionMetaKey(sessionId), 'json');
 }
 
 /**
  * Adds a partner slug to the session's partnerSlugs list (idempotent).
  * Also shadow-writes a row to D1 `partners` (best-effort, INSERT OR IGNORE).
  *
- * Throws if the session does not exist — callers must create the session
- * before adding partners so we never silently create orphaned partner records.
+ * Throws `SessionNotFoundError` if the session does not exist — callers must
+ * create the session before adding partners so we never silently create
+ * orphaned partner records.
+ *
+ * Throws `SessionFullError` once the session holds `MAX_PARTNERS` distinct
+ * slugs. Only a genuinely new slug is refused; an existing partner rejoining
+ * is always allowed, since that happens on every page load.
  */
 export async function addPartner(
 	env: SessionEnv,
@@ -147,7 +181,7 @@ export async function addPartner(
 ): Promise<void> {
 	const meta = await getSessionMeta(env, sessionId);
 	if (meta === null) {
-		throw new Error(`Session not found: ${sessionId}`);
+		throw new SessionNotFoundError(sessionId);
 	}
 	if (meta.partnerSlugs.includes(slug)) {
 		// Already registered in KV — nothing to do on KV, but still try D1
@@ -160,8 +194,13 @@ export async function addPartner(
 		}
 		return;
 	}
+	// Checked only for a slug that is genuinely new: the people already in the
+	// session re-run this on every page load and must never be locked out.
+	if (meta.partnerSlugs.length >= MAX_PARTNERS) {
+		throw new SessionFullError(sessionId);
+	}
 	meta.partnerSlugs.push(slug);
-	await env.kv.put(metaKey(sessionId), JSON.stringify(meta));
+	await env.kv.put(sessionMetaKey(sessionId), JSON.stringify(meta));
 
 	if (env.db !== null) {
 		const db = env.db;
@@ -194,22 +233,17 @@ async function insertPartnerD1(
  *
  * `updatedAt` is the maximum `ts` across all returned vote rows.
  *
- * Zero D1 rows → `null`. This covers:
- *   - Unknown partners (no partner row exists in D1).
- *   - Old KV-only sessions that pre-date W2.1 dual-write — accepted data loss.
- *
- * When `env.db` is null, falls back to KV exactly as before. Unit tests that
- * pass `{ kv, db: null }` are unaffected.
+ * Zero rows → `null`. This covers:
+ *   - Unknown partners (no partner row exists).
+ *   - Sessions predating the W2.1 dual-write, whose votes only ever existed in
+ *     KV — accepted data loss, and already unreadable since the W2.2a read
+ *     cutover.
  */
 export async function getVotes(
 	env: SessionEnv,
 	sessionId: string,
 	partnerSlug: string,
 ): Promise<PartnerVotes | null> {
-	if (env.db === null) {
-		return env.kv.get<PartnerVotes>(partnerKey(sessionId, partnerSlug), 'json');
-	}
-
 	const { results } = await env.db
 		.prepare(
 			`SELECT v.name, v.sex, v.vote, v.ts
@@ -237,12 +271,84 @@ export async function getVotes(
 }
 
 /**
- * Appends vote entries for a partner (read-modify-write on KV).
- * Also shadow-writes each vote to D1 `votes` via INSERT OR IGNORE (best-effort).
+ * Resolves the partner row id, recreating the session and partner rows if they
+ * are missing.
  *
- * Last-write-wins: the new entries are pushed onto the existing KV array.
- * D1 uses UNIQUE(partner_id, name, sex) to ensure idempotency — re-sending
- * the same votes does not create duplicate rows.
+ * `createSession` and `addPartner` write their SQL rows best-effort, so a
+ * transient failure there could leave a live session with no partner row. That
+ * used to mean votes were silently dropped; with SQL as the only store it would
+ * be outright data loss on the swipe path, so the miss is repaired instead.
+ *
+ * The repair is bounded twice over: session meta must exist in KV, and the
+ * session must hold fewer than `MAX_PARTNERS` partner rows. Without the first
+ * an unauthenticated POST to an arbitrary session id could mint rows; without
+ * the second a caller holding one session URL could mint unbounded distinct
+ * slugs, since the route's slug pattern admits far more than a session needs.
+ *
+ * Deliberately does not check `meta.partnerSlugs.includes(slug)`: KV is
+ * eventually consistent on Cloudflare, so a vote landing in another colo may
+ * not see the `addPartner` write yet, and rejecting would lose real votes. That
+ * is also why the cap is counted in SQL rather than against the blob. The slug
+ * is already validated by the route.
+ */
+async function resolvePartnerId(
+	env: SessionEnv,
+	sessionId: string,
+	partnerSlug: string,
+): Promise<string> {
+	const db = env.db;
+	const lookup = () =>
+		db
+			.prepare('SELECT id FROM partners WHERE session_id = ? AND slug = ?')
+			.bind(sessionId, partnerSlug)
+			.first<{ id: string }>();
+
+	const existing = await lookup();
+	if (existing !== null) return existing.id;
+
+	const meta = await getSessionMeta(env, sessionId);
+	if (meta === null) {
+		throw new SessionNotFoundError(sessionId);
+	}
+
+	// Bound the repair by the same cap addPartner enforces, counted in SQL
+	// rather than against meta.partnerSlugs — a slug absent from the blob is
+	// exactly the eventually-consistent case this path exists to serve. Runs
+	// only after lookup() misses, so it stays off the hot vote path.
+	const partnerCount = await db
+		.prepare('SELECT COUNT(*) AS n FROM partners WHERE session_id = ?')
+		.bind(sessionId)
+		.first<{ n: number }>();
+	if ((partnerCount?.n ?? 0) >= MAX_PARTNERS) {
+		throw new SessionFullError(sessionId);
+	}
+
+	// The sessions row must exist first: FKs are enforced on both targets, so
+	// the partners insert fails without it. Reuse the real createdAt rather than
+	// inventing one — session age is meaningful to retention.
+	await db
+		.prepare(
+			'INSERT OR IGNORE INTO sessions (id, user_id, created_at) VALUES (?, ?, ?)',
+		)
+		.bind(sessionId, null, meta.createdAt)
+		.run();
+	await insertPartnerD1(db, sessionId, partnerSlug);
+
+	const repaired = await lookup();
+	if (repaired === null) {
+		throw new Error(
+			`Failed to resolve partner row (session=${sessionId}, slug=${partnerSlug})`,
+		);
+	}
+	return repaired.id;
+}
+
+/**
+ * Appends vote entries for a partner.
+ *
+ * Writes one row per vote via INSERT OR IGNORE against
+ * UNIQUE(partner_id, name, sex), so replaying a batch is idempotent — which is
+ * what makes it safe for this to throw and for the client to retry.
  */
 export async function appendVotes(
 	env: SessionEnv,
@@ -250,41 +356,19 @@ export async function appendVotes(
 	partnerSlug: string,
 	votes: VoteEntry[],
 ): Promise<void> {
-	const existing = await getVotes(env, sessionId, partnerSlug);
-	const updated: PartnerVotes = {
-		votes: existing ? [...existing.votes, ...votes] : [...votes],
-		updatedAt: Date.now(),
-	};
-	await env.kv.put(partnerKey(sessionId, partnerSlug), JSON.stringify(updated));
+	if (votes.length === 0) return;
 
-	if (env.db !== null && votes.length > 0) {
-		const db = env.db;
-		await tryD1('appendVotes', async () => {
-			// Look up the partner_id from D1 using the KV session id + slug.
-			const partnerRow = await db
-				.prepare('SELECT id FROM partners WHERE session_id = ? AND slug = ?')
-				.bind(sessionId, partnerSlug)
-				.first<{ id: string }>();
+	const db = env.db;
+	const partnerId = await resolvePartnerId(env, sessionId, partnerSlug);
 
-			if (partnerRow === null) {
-				// Partner row is missing in D1 (e.g. addPartner D1 write previously
-				// failed). Log and skip — the KV write above already succeeded.
-				console.warn(
-					`[sessions] D1 dual-write skipped for votes: partner not found in D1 (session=${sessionId}, slug=${partnerSlug})`,
-				);
-				return;
-			}
-
-			for (const v of votes) {
-				const voteId = crypto.randomUUID();
-				await db
-					.prepare(
-						'INSERT OR IGNORE INTO votes (id, partner_id, name, sex, vote, ts) VALUES (?, ?, ?, ?, ?, ?)',
-					)
-					.bind(voteId, partnerRow.id, v.name, v.sex, v.vote, v.ts)
-					.run();
-			}
-		});
+	for (const v of votes) {
+		const voteId = crypto.randomUUID();
+		await db
+			.prepare(
+				'INSERT OR IGNORE INTO votes (id, partner_id, name, sex, vote, ts) VALUES (?, ?, ?, ?, ?, ?)',
+			)
+			.bind(voteId, partnerId, v.name, v.sex, v.vote, v.ts)
+			.run();
 	}
 }
 
@@ -355,8 +439,26 @@ export async function getMatches(
 		return { liked, supered, likeTs };
 	});
 
+	// Intersect across partners who have actually voted, not the whole roster.
+	//
+	// A slug enters partnerSlugs from a single GET /s/{id}?p={slug} and can never
+	// be removed, so a typo in a join link used to be enough to empty the match
+	// list for good: an empty liked set intersects to nothing. A partner who has
+	// not voted has expressed no opinion to intersect, so they sit the round out.
+	//
+	// The "needs two participants" rule still applies, now to the voters rather
+	// than the roster — otherwise one person's likes would surface as matches
+	// while their partner has yet to swipe.
+	const participants = likedSets
+		.map((sets, i) => ({ sets, slug: meta.partnerSlugs[i] }))
+		.filter(({ sets }) => sets.liked.size > 0);
+
+	if (participants.length < 2) {
+		return { partnerSlugs: meta.partnerSlugs, matches: [] };
+	}
+
 	// Intersect: start from the first set and keep only keys present in all.
-	const [first, ...rest] = likedSets;
+	const [first, ...rest] = participants.map((p) => p.sets);
 	const intersection = new Set<string>(
 		[...first.liked].filter((key) => rest.every((s) => s.liked.has(key))),
 	);
@@ -364,22 +466,26 @@ export async function getMatches(
 	const matches = [...intersection].map((key) => {
 		const [name, sex] = key.split('|');
 		// The key was constructed as `${name}|${'M'|'F'}` so sex is always valid.
-		const superSlugs = meta.partnerSlugs.filter((_, i) =>
-			likedSets[i].supered.has(key),
-		);
+		// Indices below are into `participants`, not the roster — a non-participant
+		// cannot have super-liked anything, since supered is a subset of liked.
+		const superSlugs = participants
+			.filter((p) => p.sets.supered.has(key))
+			.map((p) => p.slug);
 
-		// Per-partner yes/super timestamps for this match. The key is present in
-		// every partner's liked set (intersection), so likeTs.get is non-null.
-		const perPartnerTs = likedSets.map((s) => s.likeTs.get(key) as number);
+		// Per-participant yes/super timestamps for this match. The key is present
+		// in every participant's liked set (intersection), so likeTs.get is non-null.
+		const perPartnerTs = participants.map(
+			(p) => p.sets.likeTs.get(key) as number,
+		);
 		const firstMatchedAt = Math.max(...perPartnerTs);
 
-		// First liker = partner with lowest ts. Ties resolved by partnerSlugs
-		// order (Array#indexOf returns the first match), which mirrors meta order.
+		// First liker = participant with lowest ts. `participants` preserves
+		// partnerSlugs order, so ties still resolve in meta order.
 		let firstIdx = 0;
 		for (let i = 1; i < perPartnerTs.length; i++) {
 			if (perPartnerTs[i] < perPartnerTs[firstIdx]) firstIdx = i;
 		}
-		const firstLikedBy = meta.partnerSlugs[firstIdx];
+		const firstLikedBy = participants[firstIdx].slug;
 
 		return {
 			name,

@@ -2,7 +2,9 @@
 
 Thanks for your interest. Bramble is a small, open-source baby-name swipe app for couples. This guide covers local setup, the quality gate, and commit conventions.
 
-Scope lives in `docs/ROADMAP.md` (phase-level) and `docs/PHASE-1.6.md` (the active task list). If a change doesn't map to a roadmap item, open an issue first.
+Bug fixes, documentation, and small self-contained improvements are welcome with no preamble — open a PR. For anything larger, or anything that changes how an existing feature behaves, open an issue first so we can agree on the approach before you spend time on it. `docs/ROADMAP.md` is where phase-level scope lives if you want to see what's planned.
+
+By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Local setup
 
@@ -12,7 +14,13 @@ Bramble has two build targets, selected by `BRAMBLE_TARGET` (default `cloudflare
 
 ```bash
 pnpm install
-BRAMBLE_TARGET=node pnpm build:node
+BRAMBLE_TARGET=node BRAMBLE_DB_PATH=./data/bramble.sqlite pnpm dev
+```
+
+`BRAMBLE_TARGET` is read at build time, and the dev server counts, so this gives you the SQLite code paths with hot reload. For a production-shaped run instead:
+
+```bash
+pnpm build:node   # sets BRAMBLE_TARGET=node itself
 BRAMBLE_DB_PATH=./data/bramble.sqlite ORIGIN=http://localhost:3000 PORT=3000 node build/index.js
 ```
 
@@ -51,7 +59,7 @@ CI runs the same gate on every pull request. A broken `main` means broken produc
 
 ## Commit conventions
 
-- Conventional Commits: `type(scope): description` — types are `feat`, `fix`, `docs`, `test`, `refactor`, `chore`, `style`.
+- Conventional Commits: `type(scope): description` — types are `feat`, `fix`, `docs`, `test`, `refactor`, `chore`, `style`, `ci`, `build`.
 - One concern per commit. Small commits beat clever ones.
 - For bug fixes, include a test that fails without the fix.
 - `test(scope):` commits come before the `feat(scope):` they cover (TDD).
@@ -62,6 +70,30 @@ CI runs the same gate on every pull request. A broken `main` means broken produc
 - Server-only logic lives in `src/lib/server/`. Nothing in there may be imported by client code.
 - No new runtime dependencies without flagging them in your PR description and explaining why the standard library or an existing dependency won't do. Build-time dependencies are fine.
 
+## Releasing
+
+Maintainer only. Tagging is what publishes the image, so the tag has to agree
+with the repo before it is pushed — the `verify` job in `.github/workflows/release.yml`
+fails the release otherwise.
+
+1. Bump `version` in `package.json`.
+2. Move the `## [Unreleased]` items into a new `## [x.y.z] - YYYY-MM-DD` section
+   in `CHANGELOG.md`, and update the link references at the bottom. If the
+   release changes anything an operator must do before pulling, put it under
+   `### Upgrade notes` — for an app with a persistent volume, that is the most
+   valuable line in the release.
+3. Commit as `chore(release): x.y.z`.
+4. `git tag -a vx.y.z -m "vx.y.z"`
+5. `git push origin main --follow-tags`
+
+The tag push builds `linux/amd64` and `linux/arm64` on native runners, pushes
+both to GHCR, merges them into a manifest list, and then creates the GitHub
+release from the changelog section. The release is created last on purpose, so
+notes can never point at an image that was never published.
+
+A tag containing `-` (e.g. `v0.2.0-rc.1`) is treated as a prerelease and claims
+neither `latest` nor the `{{major}}.{{minor}}` alias.
+
 ## Reporting bugs and requesting features
 
-Use the issue templates. For security reports, see `SECURITY.md`.
+Use the issue templates. For security reports, see [SECURITY.md](SECURITY.md) — please don't open a public issue for those.
