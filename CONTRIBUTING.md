@@ -24,10 +24,12 @@ pnpm build:node   # sets BRAMBLE_TARGET=node itself
 BRAMBLE_DB_PATH=./data/bramble.sqlite ORIGIN=http://localhost:3000 PORT=3000 node build/index.js
 ```
 
-Or run the container:
+Or run the container. `docker-compose.yml` pulls the published image, so
+testing your own change needs the build file layered on top of it — a bare
+`docker compose up` would validate the last release, not your branch:
 
 ```bash
-docker compose up
+docker compose -f docker-compose.yml -f docker-compose.build.yml up --build
 ```
 
 See `.env.example` for the full list of environment variables and the README "Self-host" section for details.
