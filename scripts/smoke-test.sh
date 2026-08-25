@@ -20,7 +20,9 @@ NAME="bramble-smoke-$$"
 HEADERS="$(mktemp)"
 
 cleanup() {
-	docker rm -f "$NAME" >/dev/null 2>&1 || true
+	# -v drops the anonymous volume the Dockerfile's VOLUME ["/data"] creates.
+	# Without it every local run leaves one behind.
+	docker rm -f -v "$NAME" >/dev/null 2>&1 || true
 	rm -f "$HEADERS"
 }
 trap cleanup EXIT
