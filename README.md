@@ -5,9 +5,9 @@
 [![Container image](https://img.shields.io/badge/ghcr.io-lxhwes%2Fbramble-blue?logo=docker&logoColor=white)](https://github.com/lxhwes/bramble/pkgs/container/bramble)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-A free, open-source baby name matching app for parents, couples, or anyone. Swipe independently, find mutual matches.
+A free, open-source baby name matching app for parents, couples, or anyone. Swipe independently, find mutual matches, and review stats.
 
-**Bramble is built to be self-hosted.** One container, one SQLite file, no accounts and no external services — `docker compose up -d` and it's yours. There's a [live demo](#live-demo) if you'd rather look before you run anything.
+**Bramble is built to be self-hosted.** One container, one SQLite file, no accounts and no external services — `docker compose up -d` and it's yours. There's a [live demo](#live-demo) if you'd like to test drive.
 
 ![Swipe view showing the name "Calliope" on a card with no / super / yes buttons below](docs/screenshots/swipe.png)
 
@@ -91,24 +91,24 @@ The first build compiles `better-sqlite3` from source and takes a few minutes; l
 - Installable PWA with offline cache
 - QR code + Web Share API for in-person handoff
 
-### What a self-hosted instance collects
+### Privacy & Data Collection
 
-Nothing. There are no accounts, no PII, and no analytics or telemetry of any kind on the self-hosted build — no beacon, no token, nothing to opt out of. Votes live in your SQLite file and are pruned after `BRAMBLE_RETENTION_DAYS` of inactivity.
+There are no accounts, no PII, and no analytics or telemetry of any kind on the self-hosted build — no beacons, no token, nothing to opt out of. Votes live in your SQLite file and are pruned after `BRAMBLE_RETENTION_DAYS` of inactivity.
 
-The one caveat worth stating plainly: the app currently loads its two webfonts from Google Fonts, so a self-hosted page does make that third-party request. Fixing it by [self-hosting the fonts](https://github.com/lxhwes/bramble/issues/17) is tracked and open.
+The one caveat worth stating plainly: the app currently loads its two webfonts from Google Fonts, so a self-hosted page does make that third-party request. Fixing it by [self-hosting the fonts](https://github.com/lxhwes/bramble/issues/17) is a tracked and open todo.
 
 ## Why
 
-Existing name apps charge for the swipe-and-match feature, even though the underlying data is largely public. Bramble is a free alternative built on open datasets:
+Existing baby name apps charge for the swipe-and-match feature even though the underlying data is largely public. Bramble is a simple, private, and free alternative built on these open datasets:
 
 - US Social Security Administration — name frequencies back to 1880 (public domain)
 - Behind the Name — name origin and related names (CC BY-SA 4.0)
 
 ## Live demo
 
-[bramble.oovoid.com](https://bramble.oovoid.com) — a real instance you can swipe on without installing anything.
+[bramble.oovoid.com](https://bramble.oovoid.com) — a real instance anyone can start a session and swipe on without installing anything.
 
-It runs on the maintainer's Cloudflare Pages account, which is where Bramble started before self-hosting became the point. It is kept alive as a demo, not as the deployment path this project recommends: it needs a Cloudflare account, D1, KV, and dashboard-configured WAF rules, none of which the Docker image asks of you. Self-host is the path that gets the documentation and the releases.
+It runs in my Cloudflare Pages account, which is where Bramble started before pivoting into a container, with the focus on self-hosting. This is kept alive as a demo; it's not a deployment path this project recommends, howver, if that's something you're interested in, it's doable: it needs a Cloudflare account, D1, KV, and dashboard-configured WAF rules.
 
 ## How it's built
 
@@ -117,9 +117,9 @@ SvelteKit + TypeScript + Tailwind, building to two targets selected by `BRAMBLE_
 - **Docker / Node** (`BRAMBLE_TARGET=node`) — the maintained deployment path and what the published image is. `better-sqlite3` SQLite file for votes and session meta, in-process rate limiter.
 - **Cloudflare Pages** (`BRAMBLE_TARGET=cloudflare`) — the demo instance above. D1 for vote storage, KV for hot session state, edge WAF for rate limiting.
 
-The variable still defaults to `cloudflare`, which is a leftover from the pre-pivot layout rather than a statement about which target matters — [#33](https://github.com/lxhwes/bramble/issues/33) tracks flipping it. Storage sits behind a `getStorage()` seam, so the two targets share their business-logic SQL; [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) has the full feature matrix.
+The variable still defaults to `cloudflare`, which is a leftover from the original layout, rather than a statement about which target matters — [#33](https://github.com/lxhwes/bramble/issues/33) tracks correcting it. Storage sits behind a `getStorage()` seam, so the two targets share their business-logic SQL; [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) has the full feature matrix.
 
-The name dataset is preprocessed at build time into a static JSON blob — no runtime API calls.
+The name dataset is preprocessed at build time into a static JSON blob, no runtime API calls are made.
 
 ## Development
 
@@ -150,15 +150,6 @@ To test your change in the container, layer the build file over the compose file
 docker compose -f docker-compose.yml -f docker-compose.build.yml up --build
 ```
 
-### Cloudflare target
-
-Only needed when working on the demo instance:
-
-```bash
-pnpm db:migrate:local  # apply D1 migrations to the local emulator
-pnpm dev               # Vite dev server with local KV + D1 via wrangler
-```
-
 ### Quality gate
 
 ```bash
@@ -170,12 +161,6 @@ pnpm build:cf
 ```
 
 `pnpm build:names` regenerates `static/names.json` from the upstream sources — see [docs/DATA.md](docs/DATA.md). It is only needed when changing the dataset itself.
-
-## Project status
-
-Released and in daily use. v0.1.0 is the first tagged release, not a half-finished one — it's the first time the self-host contract was written down and tagged. See the [changelog](CHANGELOG.md) for what that means for upgrades.
-
-Bramble is deliberately small and feature-complete for now — the roadmap's later phases are parked, not scheduled. Bug fixes, docs, and self-hosting improvements are welcome as PRs with no preamble. For anything larger, open an issue first; the bar for un-parking a phase is real demand, not a good idea.
 
 ## Contributing
 
