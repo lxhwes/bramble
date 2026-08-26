@@ -165,7 +165,7 @@ Bramble is personal-tool grade; swipe votes lose meaning shortly after a name de
 
 - `docker compose up -d` **pulls** `ghcr.io/lxhwes/bramble` and starts a single container backed by a SQLite volume. Migrations run lazily on the first request; no separate migrate step.
 - Building from source instead needs the second compose file: `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`. Compose builds rather than pulls when a service declares both `image:` and `build:` and the image is not local, so the build path had to move out of the base file to stop every `up` recompiling `better-sqlite3`. The override file is deliberately *not* named `docker-compose.override.yml`, which Compose auto-loads.
-- Required env: `ORIGIN` (adapter-node CSRF). See the README [Self-host](../README.md#self-host) section for the full env table and host cron jobs (prune + backup).
+- Required env: `ORIGIN` (adapter-node CSRF). The README's [Run it](../README.md#run-it) section has the full env table; [SELF-HOSTING.md](SELF-HOSTING.md) covers the host cron jobs (prune + backup), reverse proxying, and upgrades.
 
 ### Release artifacts
 
