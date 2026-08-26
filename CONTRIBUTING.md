@@ -32,7 +32,7 @@ testing your own change needs the build file layered on top of it — a bare
 docker compose -f docker-compose.yml -f docker-compose.build.yml up --build
 ```
 
-See `.env.example` for the full list of environment variables and the README "Self-host" section for details.
+See `.env.example` for the full list of environment variables, the README's [Run it](README.md#run-it) section for the annotated table, and [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md) for operating an instance.
 
 ### Cloudflare target (the maintainer's hosted instance)
 
