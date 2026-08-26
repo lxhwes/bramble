@@ -11,6 +11,19 @@ A free, open-source baby name matching app for parents, couples, or anyone. Swip
 
 ![Swipe view showing the name "Calliope" on a card with no / super / yes buttons below](docs/screenshots/swipe.png)
 
+<table>
+<tr>
+<td width="33%"><img alt="Matches list showing eight mutual yeses, each with a boy or girl tag and which partner liked it first" src="docs/screenshots/matches.png"></td>
+<td width="33%"><img alt="Shortlist view with all eight matches listed and four of them starred as shortlisted" src="docs/screenshots/shortlist.png"></td>
+<td width="33%"><img alt="Stats page showing 57% agreement, per-partner like rates, mutual likes, and a list of disagreements" src="docs/screenshots/stats.png"></td>
+</tr>
+<tr>
+<td align="center"><em>Matches</em></td>
+<td align="center"><em>Shortlist</em></td>
+<td align="center"><em>Stats</em></td>
+</tr>
+</table>
+
 ## Run it
 
 ### Prerequisites
