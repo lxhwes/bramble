@@ -46,7 +46,7 @@ For anything you care about, pin a version rather than tracking `latest` — set
 
 ### Configuration
 
-Copy [`.env.example`](.env.example) to `.env` and edit it. Everything set there reaches the container.
+Copy [`.env.example`](.env.example) to `.env` and edit it. Most of what you set there reaches the container, but `docker-compose.yml` pins `BRAMBLE_TARGET`, `BRAMBLE_DB_PATH`, and `BRAMBLE_MIGRATIONS_DIR` under `environment:`, which always wins over `.env`.
 
 For any deployment other than `http://localhost:3000`, **set `ORIGIN` to the URL people will actually visit.** Getting it wrong is the most common self-host problem: session create breaks while swiping keeps working. See [Troubleshooting](docs/SELF-HOSTING.md#troubleshooting).
 
@@ -54,14 +54,14 @@ For any deployment other than `http://localhost:3000`, **set `ORIGIN` to the URL
 |---|---|---|---|
 | `ORIGIN` | yes | `http://localhost:3000` (via compose) | Full origin URL (e.g. `https://names.example.com`) — needed for CSRF on form POSTs (session create, shortlist add/remove). Compose defaults to localhost; override it for any non-local deployment |
 | `BRAMBLE_DB_PATH` | no | `/data/bramble.sqlite` | Path to the SQLite database file |
-| `PORT` | no | `3000` | Port the HTTP server listens on |
+| `PORT` | no | `3000` | Host port compose publishes; the container always listens on 3000 |
 | `BRAMBLE_RETENTION_DAYS` | no | `90` | Inactive-session prune window in days |
 | `ADDRESS_HEADER` | no | — | Header to read client IP from (e.g. `X-Forwarded-For`) when behind a reverse proxy |
 | `XFF_DEPTH` | no | — | Number of trusted reverse proxies in the `X-Forwarded-For` chain |
 | `BRAMBLE_MIGRATIONS_DIR` | no | `/app/migrations` (in the image) | Directory holding the SQL migration files |
 | `BRAMBLE_TARGET` | build-time only | `cloudflare` | Selects the adapter and is baked into the bundle at build time. The published image is already built with `node`; setting it at runtime changes nothing |
 
-Migrations run automatically — lazily, on the first request after startup rather than at boot. There is no separate migrate step.
+Migrations run automatically on the node target — lazily, on the first request after startup rather than at boot. There is no separate migrate step. On Cloudflare, D1 migrations are applied out of band, with `pnpm db:migrate:local` or `wrangler d1 migrations apply`.
 
 ### Running it for real
 

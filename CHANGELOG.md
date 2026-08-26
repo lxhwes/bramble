@@ -62,7 +62,7 @@ First tagged release and first published container image.
   in-process rate limiter keys on the real client IP.
 - **Documentation for operators**: prerequisites, a reverse-proxy example, an
   upgrade path, backup and restore, and troubleshooting organised by symptom.
-  See the README's Self-host section.
+  See [`docs/SELF-HOSTING.md`](docs/SELF-HOSTING.md).
 - **`docs/DATA.md`** covering where the name dataset comes from, the filters
   that decide what ships, and how to rebuild it.
 - **`LICENSE-DATA.md`** and `static/names.LICENSE.txt`, which document the
