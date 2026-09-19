@@ -11,9 +11,58 @@ describe('SLUG_HTML_PATTERN', () => {
 		expect(re.test('alex')).toBe(true);
 		expect(re.test('alex-1')).toBe(true);
 		expect(re.test('a-b-c-d')).toBe(true);
-		expect(re.test('Alex')).toBe(false);
 		expect(re.test('alex_1')).toBe(false);
 		expect(re.test('')).toBe(false);
+		expect(re.test(' ')).toBe(false);
+	});
+
+	// The browser runs the pattern before our submit handler ever sees the
+	// value, so anything validateJoin would normalise into a valid slug has to
+	// pass the pattern too. iOS auto-capitalises the first letter, which is how
+	// this shipped broken: "Alex" hit "Match the requested format".
+	it('accepts everything validateJoin accepts', () => {
+		const re = new RegExp(`^${SLUG_HTML_PATTERN}$`, 'v');
+		const accepted = [
+			'Alex',
+			'ALEX',
+			'Alex-1',
+			'  alex  ',
+			'alex\t',
+			'a'.repeat(32),
+		];
+		for (const input of accepted) {
+			expect(
+				re.test(input),
+				`pattern should accept ${JSON.stringify(input)}`,
+			).toBe(true);
+			expect(
+				validateJoin(input, {
+					partnerSlugs: [],
+					savedSlug: null,
+					cookieSlug: null,
+				}).kind,
+				`validateJoin should accept ${JSON.stringify(input)}`,
+			).toBe('ok');
+		}
+	});
+
+	it('rejects what validateJoin rejects', () => {
+		const re = new RegExp(`^${SLUG_HTML_PATTERN}$`, 'v');
+		const rejected = ['Alex Howes', 'alex!', 'a'.repeat(33), ''];
+		for (const input of rejected) {
+			expect(
+				re.test(input),
+				`pattern should reject ${JSON.stringify(input)}`,
+			).toBe(false);
+			expect(
+				validateJoin(input, {
+					partnerSlugs: [],
+					savedSlug: null,
+					cookieSlug: null,
+				}).kind,
+				`validateJoin should reject ${JSON.stringify(input)}`,
+			).toBe('format-error');
+		}
 	});
 });
 

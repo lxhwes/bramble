@@ -12,7 +12,7 @@
 		type FilterState,
 		type NameEntry,
 	} from '$lib/filters';
-	import { SLUG_HTML_PATTERN, validateJoin } from '$lib/join-validation';
+	import { SLUG_HINT, SLUG_HTML_PATTERN, validateJoin } from '$lib/join-validation';
 	import { shouldDropBatch } from '$lib/vote-retry';
 
 	interface PendingVote {
@@ -48,7 +48,7 @@
 			cookieSlug: data.cookieSlug ?? null,
 		});
 		if (result.kind === 'format-error') {
-			joinError = 'Use lowercase letters, numbers, or dashes (1–32 chars).';
+			joinError = SLUG_HINT;
 			pendingConfirmSlug = null;
 			return;
 		}
@@ -539,6 +539,11 @@
 				bind:value={joinInput}
 				placeholder="your-name"
 				pattern={SLUG_HTML_PATTERN}
+				title={SLUG_HINT}
+				autocapitalize="none"
+				autocorrect="off"
+				autocomplete="off"
+				spellcheck="false"
 				required
 				disabled={pendingConfirmSlug !== null}
 				oninput={() => {
