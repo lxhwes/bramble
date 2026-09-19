@@ -9,11 +9,23 @@
 
 const SLUG_RE = /^[a-z0-9-]{1,32}$/;
 
-// HTML5 input pattern attribute. Browsers parse this in /v regex mode (modern
-// Chromium 133+), which requires literal `-` inside a character class to be
-// escaped with `\`, regardless of position. `[a-z0-9-]` and `[-a-z0-9]` both
-// throw a /v SyntaxError. The HTML pattern attribute auto-anchors, so no `^...$`.
-export const SLUG_HTML_PATTERN = '[a-z0-9\\-]{1,32}';
+// HTML5 input pattern attribute. This gates the browser's own constraint
+// validation ("Match the requested format"), which runs *before* our submit
+// handler, so it has to accept everything `validateJoin` accepts — not just
+// what a slug looks like after normalising. `validateJoin` trims and
+// lowercases first, so the pattern allows surrounding whitespace (pasted or
+// autofilled values carry it) and uppercase (iOS auto-capitalises the first
+// letter of a text input, so "Alex" is what most phone users actually type).
+//
+// Browsers parse this in /v regex mode (modern Chromium 133+), which requires
+// literal `-` inside a character class to be escaped with `\`, regardless of
+// position. `[a-z0-9-]` and `[-a-z0-9]` both throw a /v SyntaxError. The HTML
+// pattern attribute auto-anchors, so no `^...$`.
+export const SLUG_HTML_PATTERN = '\\s*[A-Za-z0-9\\-]{1,32}\\s*';
+
+// Shown by the browser alongside its own validation bubble, and reused as the
+// inline error when our handler rejects the input.
+export const SLUG_HINT = 'Use letters, numbers, or dashes (1-32 characters).';
 
 export interface JoinContext {
 	partnerSlugs: string[];
